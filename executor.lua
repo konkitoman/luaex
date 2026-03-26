@@ -10,7 +10,6 @@ local function create_stack(parent)
 		set_return = function(_, _) assert("This is not a function"); end,
 		set_errored = function(_) assert("This is not a function"); end,
 		set_break = function(_) assert("This is not a loop"); end,
-		set_continue = function(_) assert("This is not a loop"); end,
 		evaluate = function(_) return true end,
 		returns = function(_) assert("This is not inside a function context") end,
 		errored = function(_) assert("This is not inside a function context") end,
@@ -18,10 +17,6 @@ local function create_stack(parent)
 			assert("This is not inside a loop context")
 			return false
 		end,
-		is_continue = function(_)
-			assert("This is not inside a loop context")
-			return false
-		end
 	}
 	setmetatable(stack, {
 		__index = function(_, at) if stack_state.has[at] then return stack_state.data[at] else return parent[at] end end,
@@ -43,7 +38,6 @@ local function stack_push_fn(parent_stack)
 		set_return = function(_, t) fn_state.returns = t end,
 		set_errored = function(_) fn_state.errored = true end,
 		set_break = function(_) assert("This is not a loop"); end,
-		set_continue = function(_) assert("This is not a loop"); end,
 		evaluate = function(self) return self:returns() == nil end,
 		returns = function(_) return fn_state.returns end,
 		errored = function(_) return fn_state.errored end,
@@ -51,10 +45,6 @@ local function stack_push_fn(parent_stack)
 			assert("This is not inside a loop context")
 			return false
 		end,
-		is_continue = function(_)
-			assert("This is not inside a loop context")
-			return false
-		end
 	}
 	setmetatable(stack, {
 		__index = function(_, at) if stack_state.has[at] then return stack_state.data[at] else return parent_stack.stack[at] end end,
@@ -76,7 +66,6 @@ local function stack_push_do(parent_stack)
 		set_return = parent_stack.set_return,
 		set_errored = parent_stack.set_errored,
 		set_break = parent_stack.set_break,
-		set_continue = parent_stack.set_continue,
 		evaluate = function(_) return parent_stack:evaluate() end,
 		returns = function(_) assert("This is not inside a function context") end,
 		errored = function(_) assert("This is not inside a function context") end,
@@ -84,10 +73,6 @@ local function stack_push_do(parent_stack)
 			assert("This is not inside a loop context")
 			return false
 		end,
-		is_continue = function(_)
-			assert("This is not inside a loop context")
-			return false
-		end
 	}
 	setmetatable(stack, {
 		__index = function(_, at) if stack_state.has[at] then return stack_state.data[at] else return parent_stack.stack[at] end end,
@@ -112,12 +97,10 @@ local function stack_push_loop(parent_stack)
 		set_return = parent_stack.set_return,
 		set_errored = parent_stack.set_errored,
 		set_break = function(_) loop_state.breaks = true end,
-		set_continue = function(_) loop_state.continues = true end,
-		evaluate = function(self) return (not (self:is_continue() or self:is_break())) and parent_stack:evaluate() end,
+		evaluate = function(self) return (not self:is_break()) and parent_stack:evaluate() end,
 		returns = function(_) assert("This is not inside a function context") end,
 		errored = function(_) assert("This is not inside a function context") end,
 		is_break = function(_) return loop_state.breaks end,
-		is_continue = function(_) return loop_state.continues end
 	}
 	setmetatable(stack, {
 		__index = function(_, at) if stack_state.has[at] then return stack_state.data[at] else return parent_stack.stack[at] end end,
@@ -132,91 +115,96 @@ local function eval_expr(SS, entry)
 
 	local O = {}
 	local VT = {
-		["D"] = function()
-			for i=1,#entry,1 do
-				SS:add(entry[i])
+		function() -- 1 Define
+			for i=1,#entry[2],1 do
+				SS:add(entry[2][i])
 			end
 		end,
-		["="] = function()
+		function() -- 2 Set
 			local _O = {}
-			for I = 1, #entry, 1 do
-				local o = eval_expr(SS, entry[I])
+			for I = 1, #entry[3], 1 do
+				local o = eval_expr(SS, entry[3][I])
 				for i = 1, #o, 1 do
 					table.insert(_O, o[i])
 				end
 			end
-			for I = 1, #entry.P, 1 do
-				local P = entry.P[I]
-				if tonumber(P) then
-					if entry.L and entry.L[I] then
-						SS.tmp[P][eval_expr(SS, entry.L[I])[1]] = table.remove(_O, 1)
+			for I = 1, #entry[2], 1 do
+				local P = entry[2][I]
+				local l = SS.stack
+
+				if type(P[1]) == "number" then
+					l = SS.tmp
+				end
+
+				for p=1, #P, 1 do
+					local k
+					if type(P[p]) == "table" then
+						k = eval_expr(SS, P[p])[1]
 					else
-						SS.tmp[P] = table.remove(_O, 1)
+						k = P[p]
 					end
-				else
-					local l = SS.stack
-					for i, at in pairs(P) do
-						if i == #P then break end
-						l = l[at]
-					end
-					if entry.L and entry.L[I] then
-						l[P[#P]][eval_expr(SS, entry.L[I])[1]] = table.remove(_O, 1)
+
+					if p == #P then
+						l[k] = table.remove(_O, 1)
 					else
-						l[P[#P]] = table.remove(_O, 1)
+						l = l[k]
 					end
 				end
 			end
 		end,
-		["I"] = function()
-			table.insert(O, entry[1])
-		end,
-		["!"] = function()
-			table.insert(O, not eval_expr(SS, entry[1])[1])
-		end,
-		["T"] = function()
+		function() -- 3 Table
 			local T = {}
-			for i=1,#entry,1 do
-				T[eval_expr(SS, entry[i][1])[1]] = eval_expr(SS, entry[i][2])[1]
+			for i=1,#entry[2],1 do
+				T[eval_expr(SS, entry[2][i])[1]] = eval_expr(SS, entry[3][i])[1]
 			end
 			table.insert(O, T)
 		end,
-		["@"] = function()
-			for I=1, #entry, 1 do
-				if tonumber(entry[I]) then
-					if entry.L and entry.L[I] then
-						table.insert(O, SS.tmp[entry[I]][eval_expr(SS, entry.L[I])[1]])
+		function() -- 4 Read
+			for I=1, #entry[2], 1 do
+				local P = entry[2][I]
+
+				local l = SS.stack
+				if type(P[1]) == "number" then
+					l = SS.tmp
+				end
+
+				for p=1,#P,1 do
+					local k
+					if type(P[p]) == "table" then
+						k = eval_expr(SS, P[p])[1]
 					else
-						table.insert(O, SS.tmp[entry[I]])
+						k = P[p]
 					end
-				else
-					local l = SS.stack
-					for _, at in pairs(entry[I]) do
-						l = l[at]
-					end
-					if entry.L and entry.L[I] then
-						table.insert(O, l[eval_expr(SS, entry.L[I])[1]])
+
+					if p==#P then
+						table.insert(O, l[k])
 					else
-						table.insert(O, l)
+						l = l[k]
 					end
 				end
 			end
 		end,
-		["F"] = function()
+		function() -- 5 Variadic
+			for i = 1, #SS["$"], 1 do
+				table.insert(O, SS["$"][i])
+			end
+		end,
+		function() -- 6 Function
 			local fn = {}
 			setmetatable(fn, {
 				__call = function(_, ...)
 					local FS = stack_push_fn(SS)
 					local A = table.pack(...)
-					for i = 1, #entry.A, 1 do
-						FS:add(entry.A[i])
-						FS.stack[entry.A[i]] = table.remove(A, 1)
+					for i = 1, #entry[2], 1 do
+						FS:add(entry[2][i])
+						FS.stack[entry[2][i]] = table.remove(A, 1)
 					end
 					FS["$"] = A
 
 					local r = {}
 
-					for I = 1, #entry, 1 do
-						local o = eval_expr(FS, entry[I])
+					for I = 1, #entry[3], 1 do
+						local o = eval_expr(FS, entry[3][I])
 						if not FS:evaluate() then break end
 						for i = 1, #o, 1 do
 							table.insert(r, o[i])
@@ -236,27 +224,30 @@ local function eval_expr(SS, entry)
 			})
 			table.insert(O, fn)
 		end,
-		["$"] = function()
-			for i = 1, #SS["$"], 1 do
-				table.insert(O, SS["$"][i])
-			end
+		function() -- 7 Insert
+			table.insert(O, entry[2])
 		end,
-		["C"] = function()
+		function() -- 8 Call
 			local A = {}
-			for i = 1, #entry, 1 do
-				local o = eval_expr(SS, entry[i])
+			for i = 1, #entry[3], 1 do
+				local o = eval_expr(SS, entry[3][i])
 				for i = 1, #o, 1 do
 					table.insert(A, o[i])
 				end
 			end
 
+			local P = entry[2]
 			local l = SS.stack
-			for _, at in pairs(entry.P) do
-				l = l[at]
+			if type(P[1]) == "number" then
+				l = SS.tmp
 			end
 
-			if entry.l then
-				l = l[eval_expr(SS, entry.l)[1]]
+			for p=1,#P,1 do
+				if type(P[p]) == "table" then
+					l = l[eval_expr(SS, P[p])[1]]
+				else
+					l = l[P[p]]
+				end
 			end
 
 			local res = table.pack(pcall(l, table.unpack(A)))
@@ -269,91 +260,91 @@ local function eval_expr(SS, entry)
 				end
 			end
 		end,
-		["?"] = function()
-			local T = eval_expr(SS, entry.C)[1]
+		function() -- 9 If
+			local T = eval_expr(SS, entry[2])[1]
 			if T then
-				if entry.t then
-					local IS = stack_push_do(SS)
-					local o = eval_expr(IS, entry.t)
-					for i = 1, #o, 1 do
-						table.insert(O, o[i])
-					end
+				local o = eval_expr(SS, entry[3])
+				if not o then return end
+				for i = 1, #o, 1 do
+					table.insert(O, o[i])
 				end
 			else
-				if entry.f then
-					local IS = stack_push_do(SS)
-					local o = eval_expr(IS, entry.f)
-					for i = 1, #o, 1 do
-						table.insert(O, o[i])
-					end
+				local o = eval_expr(SS, entry[4])
+				if not o then return end
+				for i = 1, #o, 1 do
+					table.insert(O, o[i])
 				end
 			end
 		end,
-		["W"] = function()
-			while eval_expr(SS, entry.C)[1] do
+		function() -- 10 While
+			while eval_expr(SS, entry[2])[1] do
 				local WS = stack_push_loop(SS)
-				for i = 1, #entry, 1 do
-					eval_expr(WS, entry[i])
+				for i = 1, #entry[3], 1 do
+					eval_expr(WS, entry[3][i])
 					if not WS:evaluate() then break end
 				end
 
 				if WS:is_break() then break end
 			end
 		end,
-		["f"] = function()
-			if entry["in"] then
-				for a1, a2, a3, a4, a5, a6, a7, a8, a9 in table.unpack(eval_expr(SS, entry["in"])) do
-					local FS = stack_push_loop(SS)
-					local r = { a1, a2, a3, a4, a5, a6, a7, a8, a9 }
-					for i = 1, #entry.A, 1 do
-						FS:add(entry.A[i])
-						FS.stack[entry.A[i]] = r[i]
-					end
+		function() -- 11 For
+			local s = eval_expr(SS, entry[2])[1]
+			local e = eval_expr(SS, entry[3])[1]
+			local a = eval_expr(SS, entry[4])[1]
+			for I = s, e, a do
+				local FS = stack_push_loop(SS)
+				FS:add(entry[5])
+				FS.stack[entry[5]] = I
 
-					for i = 1, #entry, 1 do
-						eval_expr(FS, entry[i])
-						if not FS:evaluate() then break end
-					end
-
-					if FS:is_break() then break end
+				for i = 1, #entry[6], 1 do
+					eval_expr(FS, entry[6][i])
+					if not FS:evaluate() then break end
 				end
-			else
-				local s = eval_expr(SS, entry.s)[1]
-				local e = eval_expr(SS, entry.e)[1]
-				local _i = eval_expr(SS, entry.i)[1]
-				for I = s, e, _i do
-					local FS = stack_push_loop(SS)
-					FS:add(entry.n)
-					FS.stack[entry.n] = I
 
-					for i = 1, #entry, 1 do
-						eval_expr(FS, entry[i])
-						if not FS:evaluate() then break end
-					end
-
-					if FS:is_break() then break end
-				end
+				if FS:is_break() then break end
 			end
 		end,
-		["B"] = function()
+		function() -- 12 Foreach
+			for a1, a2, a3 in table.unpack(eval_expr(SS, entry[2])) do
+				local FS = stack_push_loop(SS)
+				local r = { a1, a2, a3 }
+				if #entry[3] > 3 then
+					print("Too many argoments inside foreach")
+				end
+				for i = 1, #entry[3], 1 do
+					FS:add(entry[3][i])
+					FS.stack[entry[3][i]] = r[i]
+				end
+
+				for i = 1, #entry[4], 1 do
+					eval_expr(FS, entry[4][i])
+					if not FS:evaluate() then break end
+				end
+
+				if FS:is_break() then break end
+			end
+		end,
+		function() -- 13 Until
+			repeat
+				local LS = stack_push_loop(SS)
+				for i = 1, #entry[3], 1 do
+					eval_expr(LS, entry[3][i])
+					if not LS:evaluate() then break end
+				end
+			until eval_expr(LS, entry[2])[1]
+		end,
+		function() -- 14 Do
+			local IS = stack_push_do(SS)
 			for i = 1, #entry, 1 do
-				eval_expr(SS, entry[i])
-				if not SS:evaluate() then break end
+				eval_expr(IS, entry[2][i])
+				if not IS:evaluate() then break end
 			end
 		end,
-		["t"] = function()
-			for i = 1, #entry, 1 do
-				local o = eval_expr(SS, entry[i])
-				for I = 1, #o, 1 do
-					table.insert(O, o[I])
-				end
-			end
-		end,
-		["R"] = function()
+		function() -- 15 Return
 			local A = {}
 
-			for I = 1, #entry, 1 do
-				local o = eval_expr(SS, entry[I])
+			for I = 1, #entry[2], 1 do
+				local o = eval_expr(SS, entry[2][I])
 				for i = 1, #o, 1 do
 					table.insert(A, o[i])
 				end
@@ -361,127 +352,111 @@ local function eval_expr(SS, entry)
 
 			SS:set_return(A)
 		end,
-		["b"] = function()
+		function() -- 16 Break
 			SS:set_break()
 		end,
-		["c"] = function()
-			SS:set_continue()
+		function() -- 17 Not
+			table.insert(O, not eval_expr(SS, entry[2])[1])
 		end,
-		["+"] = function()
-			local l = eval_expr(SS, entry[1])[1]
-			local r = eval_expr(SS, entry[2])[1]
-
+		function() -- 18 Add
+			local l = eval_expr(SS, entry[2])[1]
+			local r = eval_expr(SS, entry[3])[1]
 			table.insert(O, l + r)
 		end,
-		["-"] = function()
-			local l = eval_expr(SS, entry[1])[1]
-			local r = eval_expr(SS, entry[2])[1]
-
+		function() -- 19 Sub
+			local l = eval_expr(SS, entry[2])[1]
+			local r = eval_expr(SS, entry[3])[1]
 			table.insert(O, l - r)
 		end,
-		["*"] = function()
-			local l = eval_expr(SS, entry[1])[1]
-			local r = eval_expr(SS, entry[2])[1]
-
+		function() -- 20 Mul
+			local l = eval_expr(SS, entry[2])[1]
+			local r = eval_expr(SS, entry[3])[1]
 			table.insert(O, l * r)
 		end,
-		["/"] = function()
-			local l = eval_expr(SS, entry[1])[1]
-			local r = eval_expr(SS, entry[2])[1]
-
+		function() -- 21 Div
+			local l = eval_expr(SS, entry[2])[1]
+			local r = eval_expr(SS, entry[3])[1]
 			table.insert(O, l / r)
 		end,
-		["^"] = function()
-			local l = eval_expr(SS, entry[1])[1]
-			local r = eval_expr(SS, entry[2])[1]
-
+		function() -- 22 Pow
+			local l = eval_expr(SS, entry[2])[1]
+			local r = eval_expr(SS, entry[3])[1]
 			table.insert(O, l ^ r)
 		end,
-		[".."] = function()
-			local l = eval_expr(SS, entry[1])[1]
-			local r = eval_expr(SS, entry[2])[1]
-
+		function() -- 23 Concat
+			local l = eval_expr(SS, entry[2])[1]
+			local r = eval_expr(SS, entry[3])[1]
 			table.insert(O, l .. r)
 		end,
-		["|"] = function()
-			local l = eval_expr(SS, entry[1])[1]
-			local r = eval_expr(SS, entry[2])[1]
-
+		function() -- 24 Or
+			local l = eval_expr(SS, entry[2])[1]
+			local r = eval_expr(SS, entry[3])[1]
 			table.insert(O, l | r)
 		end,
-		["&"] = function()
-			local l = eval_expr(SS, entry[1])[1]
-			local r = eval_expr(SS, entry[2])[1]
-
+		function() -- 25 And
+			local l = eval_expr(SS, entry[2])[1]
+			local r = eval_expr(SS, entry[3])[1]
 			table.insert(O, l & r)
 		end,
-		["~"] = function()
-			if #entry == 1 then
-				table.insert(O, ~eval_expr(SS, entry[1])[1])
-			else
-				local l = eval_expr(SS, entry[1])[1]
-				local r = eval_expr(SS, entry[2])[1]
+		function() -- 26 Xor
+			local l = eval_expr(SS, entry[2])[1]
+			local r = eval_expr(SS, entry[3])[1]
 
-				table.insert(O, l ~ r)
-			end
+			table.insert(O, l ~ r)
 		end,
-		["#"] = function()
-			for i=1,#entry,1 do
-				table.insert(O, #eval_expr(SS, entry[i])[1])
-			end
-		end,
-		[">>"] = function()
-			local l = eval_expr(SS, entry[1])[1]
-			local r = eval_expr(SS, entry[2])[1]
-
-			table.insert(O, l >> r)
-		end,
-		["<<"] = function()
-			local l = eval_expr(SS, entry[1])[1]
-			local r = eval_expr(SS, entry[2])[1]
-
-			table.insert(O, l << r)
-		end,
-		["%"] = function()
-			local l = eval_expr(SS, entry[1])[1]
-			local r = eval_expr(SS, entry[2])[1]
-
+		function() -- 27 Mod
+			local l = eval_expr(SS, entry[2])[1]
+			local r = eval_expr(SS, entry[3])[1]
 			table.insert(O, l % r)
 		end,
-		[">"] = function()
-			local l = eval_expr(SS, entry[1])[1]
-			local r = eval_expr(SS, entry[2])[1]
-
+		function() -- 28 Negative
+			table.insert(O, -eval_expr(SS, entry[2])[1])
+		end,
+		function() -- 29 Negate
+			table.insert(O, ~eval_expr(SS, entry[2])[1])
+		end,
+		function() -- 30 Length
+			table.insert(O, #eval_expr(SS, entry[2])[1])
+		end,
+		function() -- 31 Shl
+			local l = eval_expr(SS, entry[2])[1]
+			local r = eval_expr(SS, entry[3])[1]
+			table.insert(O, l << r)
+		end,
+		function() -- 32 Shr
+			local l = eval_expr(SS, entry[2])[1]
+			local r = eval_expr(SS, entry[3])[1]
+			table.insert(O, l >> r)
+		end,
+		function() -- 33 Less
+			local l = eval_expr(SS, entry[2])[1]
+			local r = eval_expr(SS, entry[3])[1]
 			table.insert(O, l > r)
 		end,
-		["<"] = function()
-			local l = eval_expr(SS, entry[1])[1]
-			local r = eval_expr(SS, entry[2])[1]
-
-			table.insert(O, l < r)
-		end,
-		["=="] = function()
-			local l = eval_expr(SS, entry[1])[1]
-			local r = eval_expr(SS, entry[2])[1]
-
-			table.insert(O, l == r)
-		end,
-		[">="] = function()
-			local l = eval_expr(SS, entry[1])[1]
-			local r = eval_expr(SS, entry[2])[1]
-
+		function() -- 34 EqLess
+			local l = eval_expr(SS, entry[2])[1]
+			local r = eval_expr(SS, entry[3])[1]
 			table.insert(O, l >= r)
 		end,
-		["<="] = function()
-			local l = eval_expr(SS, entry[1])[1]
-			local r = eval_expr(SS, entry[2])[1]
-
+		function() -- 35 Equals
+			local l = eval_expr(SS, entry[2])[1]
+			local r = eval_expr(SS, entry[3])[1]
+			table.insert(O, l == r)
+		end,
+		function() -- 36 EqGrater
+			local l = eval_expr(SS, entry[2])[1]
+			local r = eval_expr(SS, entry[3])[1]
 			table.insert(O, l <= r)
+		end,
+		function() -- 37 Grater
+			local l = eval_expr(SS, entry[2])[1]
+			local r = eval_expr(SS, entry[3])[1]
+			table.insert(O, l < r)
 		end,
 	}
 
-	local c = VT[entry.T]
-	if c then c() else print("Invalid: ", entry.T) end
+	local c = VT[entry[1]]
+	if c then c() else print("Invalid: ", entry[1]) end
 
 	return O
 end
