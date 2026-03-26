@@ -166,9 +166,6 @@ local function eval_expr(SS, entry)
 					end
 				end
 			end
-			for i = 1, #_O, 1 do
-				table.insert(O, _O[i])
-			end
 		end,
 		["I"] = function()
 			table.insert(O, entry[1])
