@@ -23,90 +23,25 @@ type TokenPunct = {
 }
 type Token = (TokenWhitespace | TokenIdent | TokenLiteral | TokenPunct) & {span: Span}
 
-type ASTExprValue = { T: "V", v: string }
-type ASTExprGet = { T: "g", P: {[number]: ASTExpr}}
-type ASTExprGroup = {
-  T: "g",
-  [number]: ASTExpr,
-}
-type ASTExprOp = {
-  T: "O",
-  o: "#" | '~',
-  r: ASTExpr,
-}
-type ASTExprOp2 = {
-  T: "o",
-  o: "+" | '-' | '*' | '/' | '^' | '|' | '&' | '~',
-  l: ASTExpr,
-  r: ASTExpr,
-}
-type ASTExprFunction = {
-  T: "f",
-  [number]: ASTStmt
-}
-type ASTExprCall = {
-  T: "c",
-  P: {[number]: ASTExpr},
-  [number]: ASTExpr,
-}
-type ASTExpr = ASTExprValue | ASTExprGet | ASTExprGroup | ASTExprOp | ASTExprOP2 | ASTExprFunction
-type ASTStmtLocal = { T: "l", D: {[number]: string}, [number]: ASTExpr }
-type ASTStmtFunction = {
-  T: "F",
-  l: boolean,
-  n: string,
-  [number]: ASTStmt
-}
-type ASTStmtSet = {
-  T: "s",
-  N: {[number]: {[number]: ASTExpr}},
-  [number]: ASTExpr,
-}
-type ASTStmtDo = {
-  T: "d",
-  [number]: ASTStmt
-}
-type ASTStmtIf = {
-  T: "?",
-  [number]: {C: ASTExpr, [number]: ASTStmt}
-}
-type ASTStmtCall = {
-  T: "C",
-  P: {[number]: ASTExpr},
-  [number]: ASTExpr,
-}
-
 -- AST
-{
-  { T = "l", D = {"a"}, {T = "v", V = 2}},
-  { T = "l", D = {"b"}, {T = "o", left = {T = "g", {T = "V", v = "a"}}, right = {T = "V", v = 1} }},
-  { T = "C", P = {{T = "V", v = "print"}}, {T = "g", {T = "V", v = "a"}, {T = "g", {T = "V", v = "b"}}},
+local ast = {
+  301, -- do
+  {
+    { 300, {"a"}, {{ 5, 2 }}}, -- local
+    { 300, {"b"}, { 20, { 200, {{ 6, "a" }}}, { 5, 1 } }}, -- local
+    { 10, { 200, {{6, "print"}}}, {{ 200, {{ 6, "g"}}}, { 200, {{ 6, "b" }}}}}, -- call
+  },
 }
 -- BIN
-{
-  T = "B",
-  { T = "=", P = {1},{T="I",2}},
-  { T = "=", P = {{"a"}},{T="@",1}},
-  { T = "=", P = {1},{ T="+",{T="@",{"a"}},{T="I",1}}},
-  { T = "=", P = {{"b"}},{T="@",1}},
-  { T = "C", P = {"print"}, {T="@", {"a"}, {"b"}}},
-}
-
-
--- TODO:
-type ASTStmtWhile = {
-  T: "W",
-  C: ASTExpr,
-  [number]: ASTStmt,
-}
-type ASTStmtFor = {
-  T: "for",
-  [number]: ASTStmt,
-}
-type ASTStmtRepeat = {
-  T: "repeat",
-  C: ASTExpr,
-  [number]: ASTStmt,
+local bin = {
+  14
+  {
+    { 2, {{1}},{7,2}},
+    { 2, {{"a"}},{4,{{1}}}},
+    { 2, {{1}},{ 18,{4,{{"a"}}},{7,1}}},
+    { 2, {{"b"}},{4,{{1}}}},
+    { 8, {"print"},{4,{{"a"},{"b"}}}},
+  }
 }
 ```
 
