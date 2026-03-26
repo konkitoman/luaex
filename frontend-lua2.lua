@@ -514,7 +514,7 @@ ast_parse_path = function(C)
     return r
   end
 
-  return {200, {6, t.i, span = t.span}, span = t.span}
+  return {200, {{6, t.i, span = t.span}}, span = t.span}
 end
 ast_parse_table = function(C)
   local S  = C[2]
@@ -598,11 +598,11 @@ ast_parse_table = function(C)
   return {7, k, v, span={S, a.span[2]}}
 end
 
-ast_parse_call = function(C, p)
+local function ast_parse_call_(C, p, P)
   local S, E  = C[2], 0
   local a = C[1][C[2]]
   if a.T == "p" and a.i == '(' then
-    local P, e = {}, nil
+    local e = nil
     repeat
       C[2] = C[2] + 1
       e = ast_parse_expr(C)
@@ -624,16 +624,46 @@ ast_parse_call = function(C, p)
       error("Cannot parse table")
     end
     C[2] = C[2] + 1
-    return {10, p, {t}, span = {S, t.span[2]}}
+    table.insert(P, t)
+    return {10, p, P, span = {S, t.span[2]}}
   elseif a.T == "l" and (a.t == '\'' or a.t == '\"' or type(a.t) == "number") then
     C[2] = C[2] + 1
-    return {10, p, {{6, a.i, span = a.span}}, span = {S, E}}
+    table.insert(P, {6, a.i, span = a.span})
+    return {10, p, P, span = {S, E}}
+  end
+end
+
+ast_parse_call = function(C, p)
+  local a = C[1][C[2]]
+  if a.T == "p" and a.i == ':' then
+    C[2] = C[2] + 1
+    tok_trim(C)
+    a = C[1][C[2]]
+    if not a or a.T ~= 'i' then
+      error("Invalid call with :")
+    end
+    local P = p
+    p = {P[1], {}, span = {P.span[1], a.span[2]}}
+    for _, x in ipairs(P[2]) do
+      table.insert(p[2], x)
+    end
+    table.insert(p[2], {6, a.i, span = a.span})
+    C[2] = C[2] + 1
+    return ast_parse_call_(C, p, {P})
+  else
+    return ast_parse_call_(C, p, {})
   end
 end
 
 ast_parse_stmt = function(C)
   tok_trim(C)
   local t = C[1][C[2]]
+  while t and t.T == 'p' and t.i == ';' do
+    C[2] = C[2] + 1
+    tok_trim(C)
+    t = C[1][C[2]]
+  end
+  if not t then return end
   if t.T == 'i' then
     if t.i == "local" then
       local S, E = t.span[1], t.span[2]
@@ -658,7 +688,9 @@ ast_parse_stmt = function(C)
             table.insert(D, a.i)
           end
         elseif a.T == 'p' then
-          if a.i ~= "," and a.i ~= '=' then
+          if a.i == ';' then
+              return {300, D, span = {S, E}}
+          elseif a.i ~= "," and a.i ~= '=' then
             error("invalid punct in local statement: " .. a.i)
           end
         else
@@ -675,8 +707,36 @@ ast_parse_stmt = function(C)
         tok_trim(C)
         a = C[1][C[2]]
       until not a or (a.T == "i" and keywords[a.i]) or (a.T == "p" and a.i == ';')
+      C[2] = C[2] + 1
       return {300, D, e, span={S, E}}
     elseif t.i == "do" then
+      local s = {}
+      local a
+      C[2] = C[2] + 1
+      tok_trim(C)
+      repeat
+        a = C[1][C[2]]
+        while a and a.T == 'p' and a.i == ';' do
+          C[2] = C[2] + 1
+          tok_trim(C)
+          a = C[1][C[2]]
+        end
+        print(a.i)
+        if not a or (a.T == 'i' and a.i == 'end') then
+          break
+        end
+        local l = ast_parse_stmt(C)
+        tok_trim(C)
+        if l then
+          table.insert(s, l)
+        end
+      until not a or (a.T == 'i' and a.i == 'end')
+
+      if not a or a.T ~= 'i' or a.i ~= 'end' then
+        error("Cannot find the and on a `do`")
+      end
+
+      return {301, s, span = {t.span[1], a.span[2]}}
     elseif t.i == "if" then
     elseif t.i == "while" then
     elseif t.i == "for" then
@@ -684,7 +744,7 @@ ast_parse_stmt = function(C)
     elseif t.i == "function" then
     else
       local S, E = t.span[1], t.span[2]
-      L = {}
+      local L = {}
       local a
       repeat
         tok_trim(C)
@@ -700,25 +760,55 @@ ast_parse_stmt = function(C)
           if c then
             return c
           end
+          if a.T == 'p' and a.i ~= ',' then
+            break
+          end
+          C[2] = C[2] + 1
         end
       until not a or (a.T == 'i' and keywords[a.i]) or (a.T == 'p' and a.i == '=')
 
       if a and a.T == 'p' and a.i == '=' then
-        local e = {}
+        local R = {}
         repeat
           C[2] = C[2] + 1
           local l = ast_parse_expr(C)
           if not l then break end
-          table.insert(e, l)
+          table.insert(R, l)
           E = l.span[2]
           tok_trim(C)
           a = C[1][C[2]]
         until not a or (a.T == "i" and keywords[a.i]) or (a.T == "p" and a.i == ';')
+
+        return {310, L, R, span={t.span[1], R[#R].span[2]}}
       end
     end
   end
 end
 
-print(show_table(ast_parse_stmt({parse([=[print{[2]=21,foo=2}]=]), 1})))
+local function compile(n)
+  if n[1] == 10 then
+    local A = {}
+    for _, a in ipairs(n[3]) do
+      table.insert(A, compile(a))
+    end
+    A.T = "C"
+    A.P = {n[2][2][1][2]}
+    return A
+  elseif n[1] == 5 then
+    return {T = "I", n[2]}
+  elseif n[1] == 6 then
+    return {T = "I", n[2]}
+  else
+    error("TODO")
+  end
+end
 
+-- print(show_table(ast_parse_stmt({parse([=[print"Hello world"]=]), 1})))
+
+local executor = require("executor")
+local context = {
+  print = print
+}
+local source = [[print(21)]]
+executor.execute(context, compile(ast_parse_stmt({parse(source), 1})))
 
