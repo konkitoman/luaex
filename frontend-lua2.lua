@@ -261,7 +261,6 @@ local function ast_parse_expr_(C)
 			if not e then
 				error("Incomplete `not` expression at: " .. t.span[1] .. "-" .. t.span[2])
 			end
-			C[2] = C[2] + 1
 			return { 3, e, span = { t.span[1], e.span[2] } }
 		elseif t.i == "function" then
 			-- 4
@@ -306,7 +305,6 @@ local function ast_parse_expr_(C)
 					error(".. ?")
 				end
 			else
-				error(". ?")
 			end
 		end
 		tok_trim(C)
@@ -735,7 +733,6 @@ ast_parse_stmt = function(C)
 					tok_trim(C)
 					a = C[1][C[2]]
 				end
-				print(a.i)
 				if not a or (a.T == "i" and a.i == "end") then
 					break
 				end
@@ -793,7 +790,7 @@ ast_parse_stmt = function(C)
 					E = l.span[2]
 					tok_trim(C)
 					a = C[1][C[2]]
-				until not a or (a.T == "i" and keywords[a.i]) or (a.T == "p" and a.i == ";")
+				until not a or (a.T == "i" and keywords[a.i]) or a.T ~= "p" or a.i ~= ","
 
 				return { 310, L, R, span = { t.span[1], R[#R].span[2] } }
 			end
@@ -802,7 +799,17 @@ ast_parse_stmt = function(C)
 end
 
 local function compile(n)
-	if n[1] == 10 then
+	if n[1] == 5 or n[1] == 6 then
+		return { 7, n[2] }
+	elseif n[1] == 0 then -- nil
+		return { 7 }
+	elseif n[1] == 1 then -- false
+		return { 7, false }
+	elseif n[1] == 2 then -- true
+		return { 7, true }
+	elseif n[1] == 3 then -- not
+		return { 17, compile(n[2]) }
+	elseif n[1] == 10 then -- call
 		local P = {}
 		local A = {}
 		for _, a in ipairs(n[2][2]) do
@@ -812,9 +819,44 @@ local function compile(n)
 			table.insert(A, compile(a))
 		end
 		return { 8, P, A }
-	elseif n[1] == 5 or n[1] == 6 then
-		return { 7, n[2] }
+	elseif n[1] == 11 then -- and
+		return {40, compile(n[2]), compile(n[3])}
+	elseif n[1] == 12 then -- or
+		return {39, compile(n[2]), compile(n[3])}
+	elseif n[1] == 20 then -- add
+		return {18, compile(n[2]), compile(n[3])}
+	elseif n[1] == 21 then -- sub
+		return {19, compile(n[2]), compile(n[3])}
+	elseif n[1] == 22 then -- mul
+		return {20, compile(n[2]), compile(n[3])}
+	elseif n[1] == 23 then -- div
+		return {21, compile(n[2]), compile(n[3])}
+	elseif n[1] == 24 then -- pow
+		return {22, compile(n[2]), compile(n[3])}
+	elseif n[1] == 200 then -- path
+		local P = {}
+		for _, a in ipairs(n[2]) do
+			table.insert(P, compile(a))
+		end
+		return {4, {P}}
+	elseif n[1] == 301 then -- do
+		local E = {}
+		for _, a in ipairs(n[2]) do
+			table.insert(E, compile(a))
+		end
+		return {14, E}
+	elseif n[1] == 310 then -- set
+		local P = {}
+		local A = {}
+		for _, a in ipairs(n[2]) do
+			table.insert(P, compile(a)[2][1])
+		end
+		for _, a in ipairs(n[3]) do
+			table.insert(A, compile(a))
+		end
+		return { 2, P, A }
 	else
+		print(n[1])
 		error("TODO")
 	end
 end
@@ -823,7 +865,22 @@ end
 
 local executor = require("executor")
 local context = {
-	print = print,
+	a = 69,
+	add = function(a, b)
+		return a + b
+	end,
+	c = {
+		print = print,
+	},
 }
-local source = [[print(21)]]
-executor.execute(context, compile(ast_parse_stmt({ parse(source), 1 })))
+local source = [[do test,a = 21 + 10, add(10,11) c.print("Every thing works?") end]]
+local tokens = parse(source)
+local ast = ast_parse_stmt({tokens, 1})
+-- print("AST")
+-- print(show_table(ast))
+local bytecode = compile(ast)
+-- print("Bytecode:")
+-- print(show_table(bytecode))
+executor.execute(context, bytecode)
+print("Context:")
+print(show_table(context))

@@ -335,7 +335,7 @@ local function eval_expr(SS, entry)
 		end,
 		function() -- 14 Do
 			local IS = stack_push_do(SS)
-			for i = 1, #entry, 1 do
+			for i = 1, #entry[2], 1 do
 				eval_expr(IS, entry[2][i])
 				if not IS:evaluate() then break end
 			end
@@ -452,6 +452,21 @@ local function eval_expr(SS, entry)
 			local l = eval_expr(SS, entry[2])[1]
 			local r = eval_expr(SS, entry[3])[1]
 			table.insert(O, l < r)
+		end,
+		function() -- 38 NotEquals
+			local l = eval_expr(SS, entry[2])[1]
+			local r = eval_expr(SS, entry[3])[1]
+			table.insert(O, l ~= r)
+		end,
+		function() -- 39 BoolOr
+			local l = eval_expr(SS, entry[2])[1]
+			local r = eval_expr(SS, entry[3])[1]
+			table.insert(O, l or r)
+		end,
+		function() -- 40 BoolAnd
+			local l = eval_expr(SS, entry[2])[1]
+			local r = eval_expr(SS, entry[3])[1]
+			table.insert(O, l and r)
 		end,
 	}
 

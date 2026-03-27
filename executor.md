@@ -421,3 +421,21 @@ type NotEquals = {
 }
 ```
 Equivalent to Lua `lhs ~= rhs`
+### 39 BooleanOr
+```luau
+type BooleanOr = {
+    [1]: 39,
+    [2]: Expr, -- lhs
+    [3]: Expr, -- rhs
+}
+```
+Equivalent to Lua `lhs or rhs`
+### 40 BooleanAnd
+```luau
+type BooleanAnd = {
+    [1]: 40,
+    [2]: Expr, -- lhs
+    [3]: Expr, -- rhs
+}
+```
+Equivalent to Lua `lhs and rhs`
