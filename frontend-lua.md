@@ -156,4 +156,6 @@ But this will result in `table: {ptr hex address}`
 | 304   | for         |
 | 305   | repeat      |
 | 306   | d function  |
+| 307   | return      |
+| 308   | break       |
 | 310   | set         |

@@ -128,7 +128,7 @@ local function parse(source)
 				i = e + 1
 				break
 			end
-			s, e, r = string.find(source, "^(%a%w*)", i)
+			s, e, r = string.find(source, "^([%a_][%w_]*)", i)
 			if s and s <= e then
 				table.insert(C[3], { T = "i", i = r, span = { s, e } })
 				i = e + 1
@@ -167,37 +167,6 @@ local function parse(source)
 
 	return C[3]
 end
-
-local source = "local a = 2;local b = a + 1;print(a, b)"
-local tokens = {
-	{ ["i"] = "local", ["T"] = "i" },
-	{ ["amount"] = 1, ["T"] = "w", ["t"] = " " },
-	{ ["i"] = "a", ["T"] = "i" },
-	{ ["amount"] = 1, ["T"] = "w", ["t"] = " " },
-	{ ["i"] = "=", ["T"] = "p" },
-	{ ["amount"] = 1, ["T"] = "w", ["t"] = " " },
-	{ ["i"] = "2", ["T"] = "l", ["t"] = "n" },
-	{ ["i"] = ";", ["T"] = "p" },
-	{ ["i"] = "local", ["T"] = "i" },
-	{ ["amount"] = 1, ["T"] = "w", ["t"] = " " },
-	{ ["i"] = "b", ["T"] = "i" },
-	{ ["amount"] = 1, ["T"] = "w", ["t"] = " " },
-	{ ["i"] = "=", ["T"] = "p" },
-	{ ["amount"] = 1, ["T"] = "w", ["t"] = " " },
-	{ ["i"] = "a", ["T"] = "i" },
-	{ ["amount"] = 1, ["T"] = "w", ["t"] = " " },
-	{ ["i"] = "+", ["T"] = "p" },
-	{ ["amount"] = 1, ["T"] = "w", ["t"] = " " },
-	{ ["i"] = "1", ["T"] = "l", ["t"] = "n" },
-	{ ["i"] = ";", ["T"] = "p" },
-	{ ["i"] = "print", ["T"] = "i" },
-	{ ["i"] = "(", ["T"] = "p" },
-	{ ["i"] = "a", ["T"] = "i" },
-	{ ["i"] = ",", ["T"] = "p" },
-	{ ["amount"] = 1, ["T"] = "w", ["t"] = " " },
-	{ ["i"] = "b", ["T"] = "i" },
-	{ ["i"] = ")", ["T"] = "p" },
-}
 
 local function tok_trim(C)
 	local i = C[2]
@@ -263,8 +232,62 @@ local function ast_parse_expr_(C)
 			end
 			return { 3, e, span = { t.span[1], e.span[2] } }
 		elseif t.i == "function" then
-			-- 4
-			error("to do function")
+			C[2] = C[2] + 1
+			tok_trim(C)
+			local k = C[1][C[2]]
+			local a = {}
+
+			if not (k.T == "p" and k.i == "(") then
+				error("Function definition expects the paramenters to begin wtih `(`")
+			end
+			repeat
+				C[2] = C[2] + 1
+				tok_trim(C)
+				k = C[1][C[2]]
+				if k and k.T == "p" and k.i == ")" then
+					break
+				end
+				if not k.T == "i" then
+					error("Expecting an ident for the function paramenters")
+				end
+				table.insert(a, k.i)
+				C[2] = C[2] + 1
+				tok_trim(C)
+				k = C[1][C[2]]
+				if k.T == "p" and k.i == ")" then
+				elseif not (k.T == "p" and k.i == ",") then
+					error("No `,` between parameters, `,` is required to separate aparameters")
+				end
+			until not k or (k.T == "p" and k.i == ")")
+			if not k or not (k.T == "p" and k.i == ")") then
+				error("Cannot find function parameters end, `)`")
+			end
+
+			C[2] = C[2] + 1
+
+			local s = {}
+			repeat
+				tok_trim(C)
+				k = C[1][C[2]]
+				while k and k.T == "p" and k.i == ";" do
+					C[2] = C[2] + 1
+					tok_trim(C)
+					k = C[1][C[2]]
+				end
+				if not k or k.T == "i" and k.i == "end" then
+					break
+				end
+				local r = ast_parse_stmt(C)
+				if not r then
+					error("Cannot read statement in function body")
+				end
+				table.insert(s, r)
+			until false
+			if not k or not (k.T == "i" or k.i == "end") then
+				error("Function without end")
+			end
+			C[2] = C[2] + 1
+			return { 4, a, s, span = { t.span[1], k.span[2] } }
 		elseif keywords[t.i] then
 			return
 		else
@@ -289,7 +312,11 @@ local function ast_parse_expr_(C)
 		if t.i == ")" then
 			return
 		elseif t.i == "{" then
-			return ast_parse_table(C)
+			local T = ast_parse_table(C)
+			if not T then
+				error("Cannot parse table")
+			end
+			return T
 		end
 
 		C[2] = C[2] + 1
@@ -313,19 +340,16 @@ local function ast_parse_expr_(C)
 			if not r then
 				error("Invalid `-` no right: " .. t.span[1] .. "-")
 			end
-			C[2] = C[2] + 1
 			return { 50, r }
 		elseif t.i == "#" then
 			if not r then
 				error("Invalid `#` no right: " .. t.span[1] .. "-")
 			end
-			C[2] = C[2] + 1
 			return { 51, r }
 		elseif t.i == "~" then
 			if not r then
 				error("Invalid `~` no right: " .. t.span[1] .. "-")
 			end
-			C[2] = C[2] + 1
 			return { 52, r }
 		elseif t.i == "(" then
 			if not r then
@@ -539,6 +563,9 @@ ast_parse_table = function(C)
 
 	repeat
 		repeat
+			if a.T == "p" and a.i == "}" then
+				break
+			end
 			if a.T == "p" and a.i == "[" then
 				C[2] = C[2] + 1
 				local l = ast_parse_expr(C)
@@ -569,9 +596,17 @@ ast_parse_table = function(C)
 				tok_trim(C)
 				a = C[1][C[2]]
 				if not l then
-					error("Cannot get table key")
+					break
 				end
-				if l[1] == 200 and #l[2] == 1 then
+
+				if a.T == "p" and a.i == "=" then
+					C[2] = C[2] + 1
+					local r = ast_parse_expr(C)
+					table.insert(k, l)
+					table.insert(v, r)
+					tok_trim(C)
+					a = C[1][C[2]]
+				else
 					if a.T ~= "p" or a.i ~= "=" then
 						table.insert(k, { 5, i })
 						i = i + 1
@@ -579,16 +614,6 @@ ast_parse_table = function(C)
 						break
 					end
 				end
-				l = l[2]
-				if a.T ~= "p" or a.i ~= "=" then
-					error("Expect =")
-				end
-				C[2] = C[2] + 1
-				local r = ast_parse_expr(C)
-				table.insert(k, l)
-				table.insert(v, r)
-				tok_trim(C)
-				a = C[1][C[2]]
 			end
 		until true
 		a = C[1][C[2]]
@@ -601,6 +626,9 @@ ast_parse_table = function(C)
 			a = C[1][C[2]]
 		end
 	until a.T == "p" and a.i == "}"
+	if not (a.T == "p" and a.i == "}") then
+		print("Cannot find table end")
+	end
 	C[2] = C[2] + 1
 
 	return { 7, k, v, span = { S, a.span[2] } }
@@ -631,7 +659,6 @@ local function ast_parse_call_(C, p, P)
 		if not t then
 			error("Cannot parse table")
 		end
-		C[2] = C[2] + 1
 		table.insert(P, t)
 		return { 10, p, P, span = { S, t.span[2] } }
 	elseif a.T == "l" and (a.t == "'" or a.t == '"' or type(a.t) == "number") then
@@ -718,8 +745,10 @@ ast_parse_stmt = function(C)
 				E = l.span[2]
 				tok_trim(C)
 				a = C[1][C[2]]
+				if (not a) or not (a.T == "p" and a.i == ",") then
+					break
+				end
 			until not a or (a.T == "i" and keywords[a.i]) or (a.T == "p" and a.i == ";")
-			C[2] = C[2] + 1
 			return { 300, D, e, span = { S, E } }
 		elseif t.i == "do" then
 			local s = {}
@@ -738,21 +767,127 @@ ast_parse_stmt = function(C)
 				end
 				local l = ast_parse_stmt(C)
 				tok_trim(C)
-				if l then
-					table.insert(s, l)
+				if not l then
+					print(show_table(C[1][C[2]]))
+					error("Cannot read statement from within do block")
 				end
+				table.insert(s, l)
 			until not a or (a.T == "i" and a.i == "end")
 
 			if not a or a.T ~= "i" or a.i ~= "end" then
-				error("Cannot find the and on a `do`")
+				error("Cannot find the end on a `do`")
 			end
 
 			return { 301, s, span = { t.span[1], a.span[2] } }
 		elseif t.i == "if" then
+			error("TODO if")
 		elseif t.i == "while" then
+			error("TODO while")
 		elseif t.i == "for" then
+			error("TODO for")
 		elseif t.i == "repeat" then
+			error("TODO repeat")
+		elseif t.i == "return" then
+			local e = {}
+			local a
+			repeat
+				C[2] = C[2] + 1
+				local l = ast_parse_expr(C)
+				if not l then
+					break
+				end
+				table.insert(e, l)
+				E = l.span[2]
+				tok_trim(C)
+				a = C[1][C[2]]
+				if (not a) or not (a.T == "p" and a.i == ",") then
+					break
+				end
+			until not a or (a.T == "i" and keywords[a.i]) or (a.T == "p" and a.i == ";")
+			return { 307, e, span = { t.span[1], a.span[2] } }
 		elseif t.i == "function" then
+			C[2] = C[2] + 1
+			tok_trim(C)
+			local P = ast_parse_path(C)
+			if not P then
+				error("Cannot read function definition path")
+			end
+
+			local a = {}
+			tok_trim(C)
+			local k = C[1][C[2]]
+			if k.T == "p" then
+				if k.i == ":" then
+					C[2] = C[2] + 1
+					tok_trim(C)
+					k = C[1][C[2]]
+					if k.T ~= "i" then
+						error("expect function name, ident")
+					end
+
+					if keywords[k.i] then
+						error("recerved keyword used as function name")
+					end
+					table.insert(a, "self")
+					table.insert(P[2], { 6, k.i, span = k.span })
+
+					C[2] = C[2] + 1
+				end
+			end
+			tok_trim(C)
+			k = C[1][C[2]]
+			if not (k.T == "p" and k.i == "(") then
+				error("Function definition expects the paramenters to begin wtih `(`")
+			end
+			repeat
+				C[2] = C[2] + 1
+				tok_trim(C)
+				k = C[1][C[2]]
+				if k and k.T == "p" and k.i == ")" then
+					break
+				end
+				if not k.T == "i" then
+					error("Expecting an ident for the function paramenters")
+				end
+				table.insert(a, k.i)
+				C[2] = C[2] + 1
+				tok_trim(C)
+				k = C[1][C[2]]
+				if k.T == "p" and k.i == ")" then
+				elseif not (k.T == "p" and k.i == ",") then
+					error("No `,` between parameters, `,` is required to separate aparameters")
+				end
+			until not k or (k.T == "p" and k.i == ")")
+			if not k or not (k.T == "p" and k.i == ")") then
+				error("Cannot find function parameters end, `)`")
+			end
+
+			C[2] = C[2] + 1
+
+			local s = {}
+			repeat
+				tok_trim(C)
+				k = C[1][C[2]]
+				while k and k.T == "p" and k.i == ";" do
+					C[2] = C[2] + 1
+					tok_trim(C)
+					k = C[1][C[2]]
+				end
+				if not k or k.T == "i" and k.i == "end" then
+					break
+				end
+				local r = ast_parse_stmt(C)
+				if not r then
+					error("Cannot read statement in function body")
+				end
+				table.insert(s, r)
+			until false
+			if not k or not (k.T == "i" or k.i == "end") then
+				error("Function without end")
+			end
+			C[2] = C[2] + 1
+
+			return { 306, false, P, a, s }
 		else
 			local S, E = t.span[1], t.span[2]
 			local L = {}
@@ -800,87 +935,143 @@ end
 
 local function compile(n)
 	if n[1] == 5 or n[1] == 6 then
-		return { 7, n[2] }
+		return { { 7, n[2] } }
 	elseif n[1] == 0 then -- nil
-		return { 7 }
+		return { { 7 } }
 	elseif n[1] == 1 then -- false
-		return { 7, false }
+		return { { 7, false } }
 	elseif n[1] == 2 then -- true
-		return { 7, true }
+		return { { 7, true } }
 	elseif n[1] == 3 then -- not
-		return { 17, compile(n[2]) }
+		return { { 17, compile(n[2])[1] } }
+	elseif n[1] == 4 then -- function
+		local S = {}
+		for _, a in ipairs(n[3]) do
+			table.insert(S, compile(a)[1])
+		end
+
+		return { { 6, n[2], S } }
+	elseif n[1] == 7 then -- table
+		local k, v = {}, {}
+		for _, a in ipairs(n[2]) do
+			table.insert(k, compile(a)[1])
+		end
+		for _, a in ipairs(n[3]) do
+			table.insert(v, compile(a)[1])
+		end
+		return { { 3, k, v } }
 	elseif n[1] == 10 then -- call
 		local P = {}
 		local A = {}
 		for _, a in ipairs(n[2][2]) do
-			table.insert(P, compile(a))
+			table.insert(P, compile(a)[1])
 		end
 		for _, a in ipairs(n[3]) do
-			table.insert(A, compile(a))
+			table.insert(A, compile(a)[1])
 		end
-		return { 8, P, A }
+		return { { 8, P, A } }
 	elseif n[1] == 11 then -- and
-		return {40, compile(n[2]), compile(n[3])}
+		return { { 40, compile(n[2])[1], compile(n[3])[1] } }
 	elseif n[1] == 12 then -- or
-		return {39, compile(n[2]), compile(n[3])}
+		return { { 39, compile(n[2])[1], compile(n[3])[1] } }
 	elseif n[1] == 20 then -- add
-		return {18, compile(n[2]), compile(n[3])}
+		return { { 18, compile(n[2])[1], compile(n[3])[1] } }
 	elseif n[1] == 21 then -- sub
-		return {19, compile(n[2]), compile(n[3])}
+		return { { 19, compile(n[2])[1], compile(n[3])[1] } }
 	elseif n[1] == 22 then -- mul
-		return {20, compile(n[2]), compile(n[3])}
+		return { { 20, compile(n[2])[1], compile(n[3])[1] } }
 	elseif n[1] == 23 then -- div
-		return {21, compile(n[2]), compile(n[3])}
+		return { { 21, compile(n[2])[1], compile(n[3])[1] } }
 	elseif n[1] == 24 then -- pow
-		return {22, compile(n[2]), compile(n[3])}
+		return { { 22, compile(n[2]), compile(n[3]) } }
+	elseif n[1] == 50 then -- negative
+		return { { 28, compile(n[2])[1] } }
+	elseif n[1] == 51 then -- length
+		return { { 30, compile(n[2])[1] } }
+	elseif n[1] == 52 then -- negate
+		return { { 29, compile(n[2])[1] } }
 	elseif n[1] == 200 then -- path
 		local P = {}
 		for _, a in ipairs(n[2]) do
-			table.insert(P, compile(a))
+			table.insert(P, compile(a)[1])
 		end
-		return {4, {P}}
+		return { { 4, { P } } }
+	elseif n[1] == 300 then -- local
+		if not n[3] then
+			return { { 1, n[2] } }
+		end
+
+		local e = {}
+		for _, a in ipairs(n[3]) do
+			table.insert(e, compile(a)[1])
+		end
+
+		local p = {}
+		for _, a in ipairs(n[2]) do
+			table.insert(p, { a })
+		end
+
+		return { { 1, n[2] }, { 2, p, e } }
 	elseif n[1] == 301 then -- do
 		local E = {}
 		for _, a in ipairs(n[2]) do
-			table.insert(E, compile(a))
+			for _, s in ipairs(compile(a)) do
+				table.insert(E, s)
+			end
 		end
-		return {14, E}
+		return { { 14, E } }
+	elseif n[1] == 306 then -- d function
+		if n[2] then
+			-- local defined function
+			error("TODO")
+		end
+		local S = {}
+		for _, a in ipairs(n[5]) do
+			table.insert(S, compile(a)[1])
+		end
+
+		return { { 2, { compile(n[3])[1][2][1] }, { { 6, n[4], S } } } }
+	elseif n[1] == 307 then -- return
+		local e = {}
+		for _, a in ipairs(n[2]) do
+			table.insert(e, compile(a)[1])
+		end
+		return { { 15, e } }
 	elseif n[1] == 310 then -- set
 		local P = {}
 		local A = {}
 		for _, a in ipairs(n[2]) do
-			table.insert(P, compile(a)[2][1])
+			table.insert(P, compile(a)[1][2][1])
 		end
 		for _, a in ipairs(n[3]) do
-			table.insert(A, compile(a))
+			table.insert(A, compile(a)[1])
 		end
-		return { 2, P, A }
+		return { { 2, P, A } }
 	else
 		print(n[1])
 		error("TODO")
 	end
 end
 
--- print(show_table(ast_parse_stmt({parse([=[print"Hello world"]=]), 1})))
-
 local executor = require("executor")
 local context = {
-	a = 69,
-	add = function(a, b)
-		return a + b
-	end,
-	c = {
-		print = print,
-	},
+	print = print,
 }
-local source = [[do test,a = 21 + 10, add(10,11) c.print("Every thing works?") end]]
+local source = [===[
+do
+	test = function (message,wrap)
+		print(wrap(message))
+	end
+
+	test("Hello world new line", function(m) print("M was", m) return m end)
+end]===]
 local tokens = parse(source)
-local ast = ast_parse_stmt({tokens, 1})
--- print("AST")
--- print(show_table(ast))
+local ast = ast_parse_stmt({ tokens, 1 })
+print("AST")
+print(show_table(ast))
 local bytecode = compile(ast)
--- print("Bytecode:")
--- print(show_table(bytecode))
-executor.execute(context, bytecode)
+print("Bytecode:")
+print(show_table(bytecode))
+executor.execute(context, bytecode[1])
 print("Context:")
 print(show_table(context))

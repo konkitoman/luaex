@@ -7,13 +7,13 @@ local function create_stack(parent)
 		["$"] = {},
 		tmp = {},
 		add = function(self, name) self.has[name] = true end,
-		set_return = function(_, _) assert("This is not a function"); end,
-		set_errored = function(_) assert("This is not a function"); end,
-		set_break = function(_) assert("This is not a loop"); end,
-		evaluate = function(_) return true end,
-		returns = function(_) assert("This is not inside a function context") end,
-		errored = function(_) assert("This is not inside a function context") end,
-		is_break = function(_)
+		set_return = function(_) assert("This is not a function"); end,
+		set_errored = function() assert("This is not a function"); end,
+		set_break = function() assert("This is not a loop"); end,
+		evaluate = function() return true end,
+		returns = function() assert("This is not inside a function context") end,
+		errored = function() assert("This is not inside a function context") end,
+		is_break = function()
 			assert("This is not inside a loop context")
 			return false
 		end,
@@ -35,13 +35,13 @@ local function stack_push_fn(parent_stack)
 		["$"] = {},
 		tmp = {},
 		add = function(self, name) self.has[name] = true end,
-		set_return = function(_, t) fn_state.returns = t end,
-		set_errored = function(_) fn_state.errored = true end,
-		set_break = function(_) assert("This is not a loop"); end,
+		set_return = function(t) fn_state.returns = t end,
+		set_errored = function(err) fn_state.errored = err end,
+		set_break = function() assert("This is not a loop"); end,
 		evaluate = function(self) return self:returns() == nil end,
-		returns = function(_) return fn_state.returns end,
-		errored = function(_) return fn_state.errored end,
-		is_break = function(_)
+		returns = function() return fn_state.returns end,
+		errored = function() return fn_state.errored end,
+		is_break = function()
 			assert("This is not inside a loop context")
 			return false
 		end,
@@ -96,11 +96,11 @@ local function stack_push_loop(parent_stack)
 		add = function(self, name) self.has[name] = true end,
 		set_return = parent_stack.set_return,
 		set_errored = parent_stack.set_errored,
-		set_break = function(_) loop_state.breaks = true end,
+		set_break = function() loop_state.breaks = true end,
 		evaluate = function(self) return (not self:is_break()) and parent_stack:evaluate() end,
-		returns = function(_) assert("This is not inside a function context") end,
-		errored = function(_) assert("This is not inside a function context") end,
-		is_break = function(_) return loop_state.breaks end,
+		returns = function() assert("This is not inside a function context") end,
+		errored = function() assert("This is not inside a function context") end,
+		is_break = function() return loop_state.breaks end,
 	}
 	setmetatable(stack, {
 		__index = function(_, at) if stack_state.has[at] then return stack_state.data[at] else return parent_stack.stack[at] end end,
@@ -212,7 +212,7 @@ local function eval_expr(SS, entry)
 					end
 
 					if FS.errored() then
-						assert(false)
+						error(FS.errored())
 					end
 
 					if FS:returns() then
@@ -252,8 +252,7 @@ local function eval_expr(SS, entry)
 
 			local res = table.pack(pcall(l, table.unpack(A)))
 			if not table.remove(res, 1) then
-				print("Call failed")
-				SS:set_errored()
+				SS.set_errored(res[1])
 			else
 				for i = 1, #res, 1 do
 					table.insert(O, res[i])
@@ -350,10 +349,10 @@ local function eval_expr(SS, entry)
 				end
 			end
 
-			SS:set_return(A)
+			SS.set_return(A)
 		end,
 		function() -- 16 Break
-			SS:set_break()
+			SS.set_break()
 		end,
 		function() -- 17 Not
 			table.insert(O, not eval_expr(SS, entry[2])[1])
