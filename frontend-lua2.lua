@@ -340,17 +340,17 @@ local function ast_parse_expr_(C)
 			if not r then
 				error("Invalid `-` no right: " .. t.span[1] .. "-")
 			end
-			return { 50, r }
+			return { 50, r, span = { t.span[1], r.span[2] } }
 		elseif t.i == "#" then
 			if not r then
 				error("Invalid `#` no right: " .. t.span[1] .. "-")
 			end
-			return { 51, r }
+			return { 51, r, span = { t.span[1], r.span[2] } }
 		elseif t.i == "~" then
 			if not r then
 				error("Invalid `~` no right: " .. t.span[1] .. "-")
 			end
-			return { 52, r }
+			return { 52, r, span = { t.span[1], r.span[2] } }
 		elseif t.i == "(" then
 			if not r then
 				error("Invalid `~` no right: " .. t.span[1] .. "-")
@@ -780,7 +780,81 @@ ast_parse_stmt = function(C)
 
 			return { 301, s, span = { t.span[1], a.span[2] } }
 		elseif t.i == "if" then
-			error("TODO if")
+			C[2] = C[2] + 1
+			tok_trim(C)
+			local c,s,b,a,l,r = {}, {}, {}, nil, nil, nil
+			l = ast_parse_expr(C)
+			if not l then
+				error("Cannot read if condition")
+			end
+			table.insert(c, l)
+
+			tok_trim(C)
+			a = C[1][C[2]]
+			if not a or a.T ~= 'i' or a.i ~= 'then' then
+				error"Expecting `then` after if condition"
+			end
+			C[2] = C[2] + 1
+			tok_trim(C)
+
+			local has_else = false
+			while a and not (a.T == 'i' and a.i == 'end') do
+				repeat
+					a = C[1][C[2]]
+					if not a then
+						error"Unexpected if: End Of Stream"
+					end
+
+					if a.T == 'i' then
+						if a.i == 'end' then
+							table.insert(s, b)
+							b = {}
+							break
+						elseif a.i == 'else' then
+							table.insert(s, b)
+							b = {}
+							C[2] = C[2] + 1
+							tok_trim(C)
+							has_else = true
+							break
+						elseif a.i == 'elseif' then
+							if has_else then
+								error"Already has else, an elseif cannot be after else"
+							end
+
+							table.insert(s, b)
+							b = {}
+							C[2] = C[2] + 1
+							tok_trim(C)
+							l = ast_parse_expr(C)
+							if not l then
+								error"Expect expresion after elseif"
+							end
+							table.insert(c, l)
+							tok_trim(C)
+							a = C[1][C[2]]
+							if not a or a.T ~= 'i' or a.i ~= 'then' then
+								error"Expect then after elseif <expr>"
+							end
+							C[2] = C[2] + 1
+							tok_trim(C)
+							break
+						end
+					end
+					r = ast_parse_stmt(C)
+					if not r then
+						error("Cannot parse statement in if block")
+					end
+					table.insert(b, r)
+					tok_trim(C)
+				until true
+			end
+			if not a or a.T ~= 'i' or a.i ~= 'end' then
+				error("Expecting end for the if statements")
+			end
+			C[2] = C[2] + 1
+
+			return {302, c, s}
 		elseif t.i == "while" then
 			error("TODO while")
 		elseif t.i == "for" then
@@ -933,7 +1007,9 @@ ast_parse_stmt = function(C)
 	end
 end
 
-local function compile(n)
+local function compile(n, _C)
+	local C = _C or {}
+
 	if n[1] == 5 or n[1] == 6 then
 		return { { 7, n[2] } }
 	elseif n[1] == 0 then -- nil
@@ -943,57 +1019,74 @@ local function compile(n)
 	elseif n[1] == 2 then -- true
 		return { { 7, true } }
 	elseif n[1] == 3 then -- not
-		return { { 17, compile(n[2])[1] } }
+		return { { 17, compile(n[2], C)[1] } }
 	elseif n[1] == 4 then -- function
 		local S = {}
 		for _, a in ipairs(n[3]) do
-			table.insert(S, compile(a)[1])
+			table.insert(S, compile(a, C)[1])
 		end
 
 		return { { 6, n[2], S } }
 	elseif n[1] == 7 then -- table
 		local k, v = {}, {}
 		for _, a in ipairs(n[2]) do
-			table.insert(k, compile(a)[1])
+			table.insert(k, compile(a, C)[1])
 		end
 		for _, a in ipairs(n[3]) do
-			table.insert(v, compile(a)[1])
+			table.insert(v, compile(a, C)[1])
 		end
 		return { { 3, k, v } }
 	elseif n[1] == 10 then -- call
 		local P = {}
 		local A = {}
 		for _, a in ipairs(n[2][2]) do
-			table.insert(P, compile(a)[1])
+			table.insert(P, compile(a, C)[1])
 		end
 		for _, a in ipairs(n[3]) do
-			table.insert(A, compile(a)[1])
+			table.insert(A, compile(a, C)[1])
 		end
 		return { { 8, P, A } }
 	elseif n[1] == 11 then -- and
-		return { { 40, compile(n[2])[1], compile(n[3])[1] } }
+		return { { 40, compile(n[2], C)[1], compile(n[3], C)[1] } }
 	elseif n[1] == 12 then -- or
-		return { { 39, compile(n[2])[1], compile(n[3])[1] } }
+		return { { 39, compile(n[2], C)[1], compile(n[3], C)[1] } }
 	elseif n[1] == 20 then -- add
-		return { { 18, compile(n[2])[1], compile(n[3])[1] } }
+		return { { 18, compile(n[2], C)[1], compile(n[3], C)[1] } }
 	elseif n[1] == 21 then -- sub
-		return { { 19, compile(n[2])[1], compile(n[3])[1] } }
+		return { { 19, compile(n[2], C)[1], compile(n[3], C)[1] } }
 	elseif n[1] == 22 then -- mul
-		return { { 20, compile(n[2])[1], compile(n[3])[1] } }
+		return { { 20, compile(n[2], C)[1], compile(n[3], C)[1] } }
 	elseif n[1] == 23 then -- div
-		return { { 21, compile(n[2])[1], compile(n[3])[1] } }
+		return { { 21, compile(n[2], C)[1], compile(n[3], C)[1] } }
 	elseif n[1] == 24 then -- pow
-		return { { 22, compile(n[2]), compile(n[3]) } }
+		return { { 22, compile(n[2], C)[1], compile(n[3], C)[1] } }
+	elseif n[1] == 30 then -- equals
+		return { { 35, compile(n[2], C)[1], compile(n[3], C)[1] } }
+	elseif n[1] == 31 then -- not equals
+		return { { 38, compile(n[2], C)[1], compile(n[3], C)[1] } }
+	elseif n[1] == 32 then -- concat
+		return { { 23, compile(n[2], C)[1], compile(n[3], C)[1] } }
+	elseif n[1] == 33 then -- <=
+		return { { 34, compile(n[2], C)[1], compile(n[3], C)[1] } }
+	elseif n[1] == 34 then -- >=
+		return { { 36, compile(n[2], C)[1], compile(n[3], C)[1] } }
 	elseif n[1] == 50 then -- negative
-		return { { 28, compile(n[2])[1] } }
+		return { { 28, compile(n[2], C)[1] } }
 	elseif n[1] == 51 then -- length
-		return { { 30, compile(n[2])[1] } }
+		return { { 30, compile(n[2], C)[1] } }
 	elseif n[1] == 52 then -- negate
-		return { { 29, compile(n[2])[1] } }
+		return { { 29, compile(n[2], C)[1] } }
+	elseif n[1] == 100 then -- group
+		local i = (C.r or 0) + 1
+		C.r = i
+
+		C.before = C.before or {}
+		table.insert(C.before, {2, {{i}}, compile(n[2], C)})
+		return {{4, {{i}}}}
 	elseif n[1] == 200 then -- path
 		local P = {}
 		for _, a in ipairs(n[2]) do
-			table.insert(P, compile(a)[1])
+			table.insert(P, compile(a, C)[1])
 		end
 		return { { 4, { P } } }
 	elseif n[1] == 300 then -- local
@@ -1003,7 +1096,7 @@ local function compile(n)
 
 		local e = {}
 		for _, a in ipairs(n[3]) do
-			table.insert(e, compile(a)[1])
+			table.insert(e, compile(a, C)[1])
 		end
 
 		local p = {}
@@ -1015,11 +1108,56 @@ local function compile(n)
 	elseif n[1] == 301 then -- do
 		local E = {}
 		for _, a in ipairs(n[2]) do
-			for _, s in ipairs(compile(a)) do
+			for _, s in ipairs(compile(a, C)) do
+				if C.before then
+					for _, o in ipairs(C.before) do
+						table.insert(E, o)
+					end
+					C.before = nil
+				end
 				table.insert(E, s)
 			end
 		end
 		return { { 14, E } }
+	elseif n[1] == 302 then -- if
+		local R = {}
+		local c, s, t = {}, {}, {}
+		for _, a in ipairs(n[2]) do
+			table.insert(c, compile(a, C)[1])
+			if C.before then
+				for _, o in ipairs(C.before) do
+					table.insert(R, o)
+				end
+				C.before = nil
+			end
+		end
+		for _, a in ipairs(n[3]) do
+			for _, l in ipairs(a) do
+				for _, o in ipairs(compile(l, C)) do
+					table.insert(t, o)
+				end
+			end
+
+			table.insert(s, {14, t})
+			t = {}
+		end
+		local r, T = {7}, nil
+		t = r
+		for i=1,#c,1 do
+			t = {9, c[i], s[i], {7}}
+			if T then
+				T[4] = t
+			else
+				r = t
+			end
+			T = t
+		end
+		if #c<#s then
+			T[4] = s[#s]
+		end
+
+		table.insert(R, r)
+		return R
 	elseif n[1] == 306 then -- d function
 		if n[2] then
 			-- local defined function
@@ -1027,24 +1165,24 @@ local function compile(n)
 		end
 		local S = {}
 		for _, a in ipairs(n[5]) do
-			table.insert(S, compile(a)[1])
+			table.insert(S, compile(a, C)[1])
 		end
 
-		return { { 2, { compile(n[3])[1][2][1] }, { { 6, n[4], S } } } }
+		return { { 2, { compile(n[3], C)[1][2][1] }, { { 6, n[4], S } } } }
 	elseif n[1] == 307 then -- return
 		local e = {}
 		for _, a in ipairs(n[2]) do
-			table.insert(e, compile(a)[1])
+			table.insert(e, compile(a, C)[1])
 		end
 		return { { 15, e } }
 	elseif n[1] == 310 then -- set
 		local P = {}
 		local A = {}
 		for _, a in ipairs(n[2]) do
-			table.insert(P, compile(a)[1][2][1])
+			table.insert(P, compile(a, C)[1][2][1])
 		end
 		for _, a in ipairs(n[3]) do
-			table.insert(A, compile(a)[1])
+			table.insert(A, compile(a, C)[1])
 		end
 		return { { 2, P, A } }
 	else
@@ -1059,11 +1197,14 @@ local context = {
 }
 local source = [===[
 do
-	test = function (message,wrap)
-		print(wrap(message))
+	local a = {2}
+	print"Before if"
+	if (#a) == 1 then
+		print"LOL"
+	else
+		print[[rezulted in false]]
 	end
-
-	test("Hello world new line", function(m) print("M was", m) return m end)
+	print"After if"
 end]===]
 local tokens = parse(source)
 local ast = ast_parse_stmt({ tokens, 1 })
