@@ -439,3 +439,12 @@ type BooleanAnd = {
 }
 ```
 Equivalent to Lua `lhs and rhs`
+### 41 FloorDiv
+```luau
+type FloorDiv = {
+    [1]: 41,
+    [2]: Expr, -- lhs
+    [3]: Expr, -- rhs
+}
+```
+Equivalent to Lua `lhs // rhs`

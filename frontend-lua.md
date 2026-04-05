@@ -133,7 +133,7 @@ But this will result in `table: {ptr hex address}`
 | 22    | `*` mul     |
 | 23    | `/` div     |
 | 24    | `^` pow     |
-| 25    | `~` bit or  |
+| 25    | `~` xor     |
 | 26    | `&` bit and |
 | 27    | `%` modulo  |
 | 28    | `<` grater  |
@@ -141,6 +141,10 @@ But this will result in `table: {ptr hex address}`
 | 30    | equals      |
 | 31    | not equals  |
 | 32    | concat      |
+| 33    | `//`        |
+| 34    | `|` bit or  |
+| 35    | `<<` shl    |
+| 36    | `>>` shr    |
 | 38    | `<=`        |
 | 39    | `>=`        |
 | 50    | - subtract  |

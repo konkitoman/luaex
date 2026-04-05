@@ -1,3 +1,5 @@
+-- Lua: 5.5
+
 local function create_stack(parent)
 	local stack = {}
 	local stack_state = {
@@ -466,6 +468,11 @@ local function eval_expr(SS, entry)
 			local l = eval_expr(SS, entry[2])[1]
 			local r = eval_expr(SS, entry[3])[1]
 			table.insert(O, l and r)
+		end,
+		function() -- 41 FloorDiv
+			local l = eval_expr(SS, entry[2])[1]
+			local r = eval_expr(SS, entry[3])[1]
+			table.insert(O, l // r)
 		end,
 	}
 
