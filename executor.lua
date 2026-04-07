@@ -238,21 +238,8 @@ local function eval_expr(SS, entry)
 				end
 			end
 
-			local P = entry[2]
-			local l = SS.stack
-			if type(P[1]) == "number" then
-				l = SS.tmp
-			end
-
-			for p=1,#P,1 do
-				if type(P[p]) == "table" then
-					l = l[eval_expr(SS, P[p])[1]]
-				else
-					l = l[P[p]]
-				end
-			end
-
-			local res = table.pack(pcall(l, table.unpack(A)))
+			local f = eval_expr(SS, entry[2])[1]
+			local res = table.pack(pcall(f, table.unpack(A)))
 			if not table.remove(res, 1) then
 				SS.set_errored(res[1])
 			else

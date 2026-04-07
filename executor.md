@@ -148,7 +148,7 @@ Used to insert data inside the executor.
 ```luau
 type Call = {
     [1]: 8,
-    [2]: Path,
+    [2]: Expr,
     [3]: {[number]: Expr}, -- arguments
 }
 ```

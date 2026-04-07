@@ -930,7 +930,36 @@ ast_parse_stmt = function(C)
 
 			return { 302, c, s }
 		elseif t.i == "while" then
-			error("TODO while")
+			C[2] = C[2] + 1
+			tok_trim(C)
+			local b, c, a, s = {}, nil, nil, nil
+			c = ast_parse_expr(C)
+			if not c then
+				error("Expect while condition")
+			end
+			tok_trim(C)
+			a = C[1][C[2]]
+			if not a or a.T ~= 'i' or a.i ~= 'do' then
+				error("Expect do after while condition")
+			end
+			C[2] = C[2] + 1
+			tok_trim(C)
+			a = C[1][C[2]]
+			while a and a.T ~= 'i' and a.i ~= 'end' do
+				s = ast_parse_stmt(C)
+				if not s then
+					error("Cannot read statement")
+				end
+				table.insert(b, s)
+				tok_trim(C)
+				a = C[1][C[2]]
+			end
+			if not a or a.T ~= 'i' or a.i ~= 'end' then
+				error("a while is expected to be ended in a while")
+			end
+			C[2] = C[2] + 1
+
+			return {303, c, b}
 		elseif t.i == "for" then
 			error("TODO for")
 		elseif t.i == "repeat" then
@@ -1111,11 +1140,8 @@ local function compile(n, _C)
 		end
 		return { { 3, k, v } }
 	elseif n[1] == 10 then -- call
-		local P = {}
+		local P = compile(n[2], C)[1]
 		local A = {}
-		for _, a in ipairs(n[2][2]) do
-			table.insert(P, compile(a, C)[1])
-		end
 		for _, a in ipairs(n[3]) do
 			table.insert(A, compile(a, C)[1])
 		end
@@ -1250,6 +1276,8 @@ local function compile(n, _C)
 
 		table.insert(R, r)
 		return R
+	elseif n[1] == 303 then -- While
+		error("TODO while")
 	elseif n[1] == 306 then -- d function
 		if n[2] then
 			-- local defined function
@@ -1282,6 +1310,13 @@ local function compile(n, _C)
 		error("TODO")
 	end
 end
+
+local context = {
+	print = print
+}
+
+local executor = require("executor")
+executor.execute(context, compile(ast_parse_stmt({parse[=[do print[[Hello world]] end]=],1}))[1])
 
 return {
 	parse = parse,
