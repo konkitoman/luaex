@@ -4,31 +4,37 @@ local tests = {
 	["function"] = function()
 		local context = {}
 		executor.execute(context, { 6, {}, {} })()
-		assert(executor.execute(context, { 6, { "a" }, { { 4, { { "a" } } } } })(32) == 32)
+		assert(executor.execute(context, { 6, { "a" }, { { 4, { { { "a" } } } } } })(32) == 32)
 	end,
 	["global function"] = function()
 		local context = {}
-		executor.execute(context, { 2, { { "testing" } }, { { 6, {}, {} } } })
+		executor.execute(context, { 2, { { { "testing" } } }, { { 6, {}, {} } } })
 		context.testing()
 	end,
 	["global function, implicit return"] = function()
 		local context = {}
-		executor.execute(context, { 2, { { "implicit" } }, { { 6, { "a" }, { { 4, { { "a" } } } } } } })
+		executor.execute(context, { 2, { { { "implicit" } } }, { { 6, { "a" }, { { 4, { { { "a" } } } } } } } })
 		assert(context.implicit(32) == 32)
 	end,
 	["global function, implicit return, variadic"] = function()
 		local context = {}
-		executor.execute(context, { 2, { { "implicit" } }, { { 6, {}, { { 5 } } } } })
+		executor.execute(context, { 2, { { { "implicit" } } }, { { 6, {}, { { 5 } } } } })
 		local a, b, c = context.implicit(32, 60)
 		assert(a == 32 and b == 60 and c == nil)
-		executor.execute(context, { 2, { { "implicit" } }, { { 6, { "slf" }, { { 4, { { "slf" } } }, { 5 } } } } })
+		executor.execute(
+			context,
+			{ 2, { { { "implicit" } } }, { { 6, { "slf" }, { { 4, { { { "slf" } } } }, { 5 } } } } }
+		)
 		a, b, c = nil, nil, nil
 		a, b, c = context.implicit(32, 60)
 		assert(a == 32 and b == 60 and c == nil)
 	end,
 	["function, return"] = function()
 		local context = {}
-		executor.execute(context, { 2, { { "returns" } }, { { 6, { "a" }, { { 15, { { 4, { { "a" } } } } } } } } })
+		executor.execute(
+			context,
+			{ 2, { { { "returns" } } }, { { 6, { "a" }, { { 15, { { 4, { { { "a" } } } } } } } } } }
+		)
 		assert(context.returns(32) == 32)
 	end,
 	["call"] = function()
@@ -38,7 +44,7 @@ local tests = {
 		end
 
 		local context = { to_call = fn }
-		executor.execute(context, { 8, { "to_call" }, {} })
+		executor.execute(context, { 8, { 4, { { { "to_call" } } } }, {} })
 
 		assert(was_called)
 	end,
@@ -49,7 +55,7 @@ local tests = {
 		end
 
 		local context = { to_call = fn }
-		executor.execute(context, { 8, { "to_call" }, { { 7, 21 } } })
+		executor.execute(context, { 8, { 4, { { { "to_call" } } } }, { { 7, 21 } } })
 
 		assert(was_called)
 	end,
@@ -60,7 +66,7 @@ local tests = {
 		end
 
 		local context = { fn = fn, to_call = "fn" }
-		executor.execute(context, { 8, { { 4, { { "to_call" } } } }, { { 7, 21 } } })
+		executor.execute(context, { 8, { 4, { { { { 4, { { { "to_call" } } } } } } } }, { { 7, 21 } } })
 
 		assert(was_called)
 	end,
@@ -81,8 +87,8 @@ local tests = {
 		local context = { a = 1 }
 		executor.execute(context, {
 			10,
-			{ 37, { 4, { { "a" } } }, { 7, 20 } },
-			{ { 2, { { "a" } }, { { 18, { 4, { { "a" } } }, { 7, 1 } } } } },
+			{ 37, { 4, { { { "a" } } } }, { 7, 20 } },
+			{ { 2, { { { "a" } } }, { { 18, { 4, { { { "a" } } } }, { 7, 1 } } } } },
 		})
 		assert(context.a == 20)
 	end,
@@ -90,10 +96,10 @@ local tests = {
 		local context = { a = 1 }
 		executor.execute(context, {
 			10,
-			{ 37, { 4, { { "a" } } }, { 7, 20 } },
+			{ 37, { 4, { { { "a" } } } }, { 7, 20 } },
 			{
-				{ 9, { 35, { 4, { { "a" } } }, { 7, 10 } }, { 16 }, { 7 } },
-				{ 2, { { "a" } }, { { 18, { 4, { { "a" } } }, { 7, 1 } } } },
+				{ 9, { 35, { 4, { { { "a" } } } }, { 7, 10 } }, { 16 }, { 7 } },
+				{ 2, { { { "a" } } }, { { 18, { 4, { { { "a" } } } }, { 7, 1 } } } },
 			},
 		})
 		assert(context.a == 10)
@@ -104,13 +110,13 @@ local tests = {
 			12,
 			{
 				8,
-				{ "pairs" },
+				{ 4, { { { "pairs" } } } },
 				{ { 7, { 5, 5, 3, 4, 5, 6 } } },
 			},
 			{ "i", "v" },
 			{
-				{ 2, { { "isum" } }, { { 18, { 4, { { "isum" } } }, { 4, { { "i" } } } } } },
-				{ 2, { { "sum" } }, { { 18, { 4, { { "sum" } } }, { 4, { { "v" } } } } } },
+				{ 2, { { { "isum" } } }, { { 18, { 4, { { { "isum" } } } }, { 4, { { { "i" } } } } } } },
+				{ 2, { { { "sum" } } }, { { 18, { 4, { { { "sum" } } } }, { 4, { { { "v" } } } } } } },
 			},
 		})
 		assert(context.sum == 28)
@@ -122,14 +128,14 @@ local tests = {
 			12,
 			{
 				8,
-				{ "pairs" },
+				{ 4, { { { "pairs" } } } },
 				{ { 7, { 5, 5, 3, 10, 4, 5, 6 } } },
 			},
 			{ "i", "v" },
 			{
-				{ 9, { 35, { 4, { { "v" } } }, { 7, 10 } }, { 16 }, { 7 } },
-				{ 2, { { "isum" } }, { { 18, { 4, { { "isum" } } }, { 4, { { "i" } } } } } },
-				{ 2, { { "sum" } }, { { 18, { 4, { { "sum" } } }, { 4, { { "v" } } } } } },
+				{ 9, { 35, { 4, { { { "v" } } } }, { 7, 10 } }, { 16 }, { 7 } },
+				{ 2, { { { "isum" } } }, { { 18, { 4, { { { "isum" } } } }, { 4, { { { "i" } } } } } } },
+				{ 2, { { { "sum" } } }, { { 18, { 4, { { { "sum" } } } }, { 4, { { { "v" } } } } } } },
 			},
 		})
 		assert(context.sum == 13)
@@ -146,8 +152,8 @@ local tests = {
 			{
 				{
 					2,
-					{ { "sum" } },
-					{ { 18, { 4, { { "sum" } } }, { 4, { { "i" } } } } },
+					{ { { "sum" } } },
+					{ { 18, { 4, { { { "sum" } } } }, { 4, { { { "i" } } } } } },
 				},
 			},
 		})
@@ -162,11 +168,11 @@ local tests = {
 			{ 7, 1 },
 			"i",
 			{
-				{ 9, { 35, { 4, { { "i" } } }, { 7, 5 } }, { 16 }, { 7 } },
+				{ 9, { 35, { 4, { { { "i" } } } }, { 7, 5 } }, { 16 }, { 7 } },
 				{
 					2,
-					{ { "sum" } },
-					{ { 18, { 4, { { "sum" } } }, { 4, { { "i" } } } } },
+					{ { { "sum" } } },
+					{ { 18, { 4, { { { "sum" } } } }, { 4, { { { "i" } } } } } },
 				},
 			},
 		})
@@ -177,7 +183,7 @@ local tests = {
 		local r = executor.execute(context, {
 			3,
 			{ { 7, "a" }, { 7, "b" } },
-			{ { 4, { { "a" } } }, { 4, { { "b" } } } },
+			{ { 4, { { { "a" } } } }, { 4, { { { "b" } } } } },
 		})
 
 		assert(r.a == context.a)
@@ -197,9 +203,19 @@ local tests = {
 		local r = executor.execute(context, {
 			3,
 			{ { 7, "a" }, { 7, "test" } },
-			{ { 7, 20 }, { 6, { "self" }, { { 4, { { "self", "a" } } } } } },
+			{ { 7, 20 }, { 6, { "self" }, { { 4, { { { "self", "a" } } } } } } },
 		})
 		assert(r:test() == 20)
+	end,
+	["table, indirect set"] = function()
+		local context = { table = {} }
+		executor.execute(context, { 2, { { { 1 }, { 4, { { { "table" } } } } } }, { { 7, 21 } } })
+		assert(context.table[1] == 21)
+	end,
+	["table, indirect get"] = function()
+		local context = { table = { "nice" } }
+		local r = executor.execute(context, { 4, { { { 1 }, { 4, { { { "table" } } } } } } })
+		assert(r == "nice")
 	end,
 }
 

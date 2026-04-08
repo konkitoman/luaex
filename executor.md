@@ -69,10 +69,13 @@ local tb = execute(context, {3, {{7, "a"}}, {{7, 32}} })
 ## Bytecode
 
 ```luau
-type Path =
-{[number]: number | string | Expr }
+type Path ={
+    {[number]: number | string | Expr },
+    [2]: 0 | Expr | nil -- the base
+}
 ```
-If the first path segment is a number, then will be used as a temp value.
+If the `[2]` is 0, then will be stored in the tmp stack.
+For accessing the tmp 1, the path will look like: `{ { 1 }, 0 }`
 
 ### 1 Define
 ```luau

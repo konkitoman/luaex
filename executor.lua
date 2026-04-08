@@ -134,19 +134,23 @@ local function eval_expr(SS, entry)
 				local P = entry[2][I]
 				local l = SS.stack
 
-				if type(P[1]) == "number" then
-					l = SS.tmp
+				if P[2] then
+					if P[2] == 0 then
+						l = SS.tmp
+					elseif type(P[2]) == "table" then
+						l = eval_expr(SS, P[2])[1]
+					end
 				end
 
-				for p=1, #P, 1 do
+				for p=1, #P[1], 1 do
 					local k
-					if type(P[p]) == "table" then
-						k = eval_expr(SS, P[p])[1]
+					if type(P[1][p]) == "table" then
+						k = eval_expr(SS, P[1][p])[1]
 					else
-						k = P[p]
+						k = P[1][p]
 					end
 
-					if p == #P then
+					if p == #P[1] then
 						l[k] = table.remove(_O, 1)
 					else
 						l = l[k]
@@ -166,19 +170,23 @@ local function eval_expr(SS, entry)
 				local P = entry[2][I]
 
 				local l = SS.stack
-				if type(P[1]) == "number" then
-					l = SS.tmp
+				if P[2] then
+					if P[2] == 0 then
+						l = SS.tmp
+					elseif type(P[2]) == "table" then
+						l = eval_expr(SS, P[2])[1]
+					end
 				end
 
-				for p=1,#P,1 do
+				for p=1,#P[1],1 do
 					local k
-					if type(P[p]) == "table" then
-						k = eval_expr(SS, P[p])[1]
+					if type(P[1][p]) == "table" then
+						k = eval_expr(SS, P[1][p])[1]
 					else
-						k = P[p]
+						k = P[1][p]
 					end
 
-					if p==#P then
+					if p==#P[1] then
 						table.insert(O, l[k])
 					else
 						l = l[k]
