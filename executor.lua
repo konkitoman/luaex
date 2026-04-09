@@ -199,39 +199,35 @@ local function eval_expr(SS, entry)
 			end
 		end,
 		function() -- 6 Function
-			local fn = {}
-			setmetatable(fn, {
-				__call = function(_, ...)
-					local FS = stack_push_fn(SS)
-					local A = table.pack(...)
-					for i = 1, #entry[2], 1 do
-						FS:add(entry[2][i])
-						FS.stack[entry[2][i]] = table.remove(A, 1)
-					end
-					FS["$"] = A
+			table.insert(O, function(...)
+				local FS = stack_push_fn(SS)
+				local A = table.pack(...)
+				for i = 1, #entry[2], 1 do
+					FS:add(entry[2][i])
+					FS.stack[entry[2][i]] = table.remove(A, 1)
+				end
+				FS["$"] = A
 
-					local r = {}
+				local r = {}
 
-					for I = 1, #entry[3], 1 do
-						local o = eval_expr(FS, entry[3][I])
-						if not FS:evaluate() then break end
-						for i = 1, #o, 1 do
-							table.insert(r, o[i])
-						end
+				for I = 1, #entry[3], 1 do
+					local o = eval_expr(FS, entry[3][I])
+					if not FS:evaluate() then break end
+					for i = 1, #o, 1 do
+						table.insert(r, o[i])
 					end
+				end
 
-					if FS.errored() then
-						error(FS.errored())
-					end
+				if FS.errored() then
+					error(FS.errored())
+				end
 
-					if FS:returns() then
-						return table.unpack(FS:returns())
-					else
-						if r then return table.unpack(r) end
-					end
-				end,
-			})
-			table.insert(O, fn)
+				if FS:returns() then
+					return table.unpack(FS:returns())
+				else
+					if r then return table.unpack(r) end
+				end
+			end)
 		end,
 		function() -- 7 Insert
 			table.insert(O, entry[2])
