@@ -382,18 +382,18 @@ local function eval_expr(SS, entry)
 		function() -- 24 Or
 			local l = eval_expr(SS, entry[2])[1]
 			local r = eval_expr(SS, entry[3])[1]
-			table.insert(O, l | r)
+			table.insert(O, l | r) -- not avalibile in luau
 		end,
 		function() -- 25 And
 			local l = eval_expr(SS, entry[2])[1]
 			local r = eval_expr(SS, entry[3])[1]
-			table.insert(O, l & r)
+			table.insert(O, l & r) -- not avalibile in luau
 		end,
 		function() -- 26 Xor
 			local l = eval_expr(SS, entry[2])[1]
 			local r = eval_expr(SS, entry[3])[1]
 
-			table.insert(O, l ~ r)
+			table.insert(O, l ~ r) -- not avalibile in luau
 		end,
 		function() -- 27 Mod
 			local l = eval_expr(SS, entry[2])[1]
@@ -404,7 +404,7 @@ local function eval_expr(SS, entry)
 			table.insert(O, -eval_expr(SS, entry[2])[1])
 		end,
 		function() -- 29 Negate
-			table.insert(O, ~eval_expr(SS, entry[2])[1])
+			table.insert(O, ~eval_expr(SS, entry[2])[1]) -- not avalibile in luau
 		end,
 		function() -- 30 Length
 			table.insert(O, #eval_expr(SS, entry[2])[1])
@@ -412,12 +412,12 @@ local function eval_expr(SS, entry)
 		function() -- 31 Shl
 			local l = eval_expr(SS, entry[2])[1]
 			local r = eval_expr(SS, entry[3])[1]
-			table.insert(O, l << r)
+			table.insert(O, l << r) -- not avalibile in luau
 		end,
 		function() -- 32 Shr
 			local l = eval_expr(SS, entry[2])[1]
 			local r = eval_expr(SS, entry[3])[1]
-			table.insert(O, l >> r)
+			table.insert(O, l >> r) -- not avalibile in luau
 		end,
 		function() -- 33 Less
 			local l = eval_expr(SS, entry[2])[1]
