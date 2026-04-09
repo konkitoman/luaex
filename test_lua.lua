@@ -209,6 +209,109 @@ table.insert(tests, { "parentheses_override", "(5 + 2) * 10", 70 })
 -- 10 % 3 // 2 is (10 % 3) // 2 = 1 // 2 = 0
 table.insert(tests, { "modulo_floor_precedence", "10 % 3 // 2", 0 })
 
+table.insert(tests, {
+	"IIFE",
+	[=[(function() return 21 end)()]=],
+	21,
+})
+
+table.insert(tests, {
+	"IIFE, local",
+	[=[
+	(function()
+		local a = 32
+		return a
+	end)()
+	]=],
+	32,
+})
+
+table.insert(tests, {
+	"IIFE, set",
+	[=[
+	(function()
+		local a = 32
+		a = 138
+		return a
+	end)()
+	]=],
+	138,
+})
+
+table.insert(tests, {
+	"IIFE, if true",
+	[=[
+	(function()
+		if true then
+			return 10
+		end
+		return 21
+	end)()
+	]=],
+	10,
+})
+
+table.insert(tests, {
+	"IIFE, if false",
+	[=[
+	(function()
+		if false then
+			return 10
+		else
+			return 100
+		end
+		return 21
+	end)()
+	]=],
+	100,
+})
+
+table.insert(tests, {
+	"IIFE, if elseif",
+	[=[
+	(function()
+		if false then
+			return 10
+		elseif true then
+			return 323
+		else
+			return 100
+		end
+		return 21
+	end)()
+	]=],
+	323,
+})
+
+table.insert(tests, {
+	"IIFE, while",
+	[=[
+	(function()
+		local a = 0
+		while a < 10 do
+			a = a + 1
+		end
+		return a
+	end)()
+	]=],
+	10,
+})
+
+table.insert(tests, {
+	"IIFE, while break",
+	[=[
+	(function()
+		local a = 0
+		while a < 100 do
+			a = a + 1
+			if a == 50 then break end
+		end
+		return a
+	end)()
+	]=],
+	50,
+})
+
 local function run_test(test)
 	local name, source, result = table.unpack(test)
 	local is_ok, tokens_or_error, ast_node_or_error, bytecode_or_error, res
@@ -220,6 +323,7 @@ local function run_test(test)
 	end
 	is_ok, ast_node_or_error = pcall(frontend.ast_parse_expr, tokens_or_error)
 	if not is_ok then
+		print("Tokens:", show_table(tokens_or_error))
 		print("\tError while parsing expression")
 		print("\t" .. ast_node_or_error)
 		return false
@@ -229,6 +333,7 @@ local function run_test(test)
 
 	is_ok, bytecode_or_error = pcall(frontend.compile, ast_node_or_error, C)
 	if not is_ok then
+		print("AST:", show_table(ast_node_or_error))
 		print("\tError while compiling ast_node")
 		print("\t" .. bytecode_or_error)
 		return false
@@ -245,6 +350,8 @@ local function run_test(test)
 	local context = {}
 	is_ok, res = pcall(executor.execute, context, { 6, {}, bytecode })
 	if not is_ok then
+		print("AST:", show_table(ast_node_or_error))
+		print("Bytecode:", show_table(bytecode))
 		print("\tError while executing")
 		print("\t" .. res)
 		return false
@@ -252,6 +359,8 @@ local function run_test(test)
 
 	is_ok, res = pcall(res)
 	if not is_ok then
+		print("AST:", show_table(ast_node_or_error))
+		print("Bytecode:", show_table(bytecode))
 		print("\tError while running the virtual function")
 		print("\t" .. res)
 		return false
@@ -261,6 +370,8 @@ local function run_test(test)
 		return true
 	end
 
+	print("AST:", show_table(ast_node_or_error))
+	print("Bytecode:", show_table(bytecode))
 	print("\t Not maching: " .. show_table(result) .. " ~= " .. show_table(res))
 	return false
 end

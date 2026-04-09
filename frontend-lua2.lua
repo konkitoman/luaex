@@ -449,6 +449,15 @@ ast_parse_expr = function(C)
 			return l
 		end
 	elseif t.T == "p" then
+		if l[1] == 100 then
+			local T = C[2]
+			local c = ast_parse_call(C, { 200, {}, l })
+			if c then
+				return c
+			end
+			C[2] = T
+		end
+
 		C[2] = C[2] + 1
 		local s = C[1][C[2]]
 
@@ -557,6 +566,7 @@ ast_parse_expr = function(C)
 				error("Invalid `|` expresion no, right at: " .. t.span[1] .. "-")
 			end
 			return ast_expr_apply_precedence({ 34, l, r, span = { l.span[1], r.span[2] } })
+		elseif t.i == "(" then
 		end
 	end
 	C[2] = S
@@ -752,7 +762,7 @@ ast_parse_call = function(C, p)
 			error("Invalid call with :")
 		end
 		local P = p
-		p = { P[1], {}, span = { P.span[1], a.span[2] } }
+		p = { P[1], {}, p[2], span = { P.span[1], a.span[2] } }
 		for _, x in ipairs(P[2]) do
 			table.insert(p[2], x)
 		end
@@ -842,7 +852,6 @@ ast_parse_stmt = function(C)
 				local l = ast_parse_stmt(C)
 				tok_trim(C)
 				if not l then
-					print(show_table(C[1][C[2]]))
 					error("Cannot read statement from within do block")
 				end
 				table.insert(s, l)
@@ -939,13 +948,13 @@ ast_parse_stmt = function(C)
 			end
 			tok_trim(C)
 			a = C[1][C[2]]
-			if not a or a.T ~= 'i' or a.i ~= 'do' then
+			if not a or a.T ~= "i" or a.i ~= "do" then
 				error("Expect do after while condition")
 			end
 			C[2] = C[2] + 1
 			tok_trim(C)
 			a = C[1][C[2]]
-			while a and a.T ~= 'i' and a.i ~= 'end' do
+			while a and not (a.T == "i" and a.i == "end") do
 				s = ast_parse_stmt(C)
 				if not s then
 					error("Cannot read statement")
@@ -954,16 +963,19 @@ ast_parse_stmt = function(C)
 				tok_trim(C)
 				a = C[1][C[2]]
 			end
-			if not a or a.T ~= 'i' or a.i ~= 'end' then
+			if not a or a.T ~= "i" or a.i ~= "end" then
 				error("a while is expected to be ended in a while")
 			end
 			C[2] = C[2] + 1
 
-			return {303, c, b}
+			return { 303, c, b }
 		elseif t.i == "for" then
 			error("TODO for")
 		elseif t.i == "repeat" then
 			error("TODO repeat")
+		elseif t.i == "break" then
+			C[2] = C[2] + 1
+			return { 308, span = t.span }
 		elseif t.i == "return" then
 			local e = {}
 			local a
@@ -1125,8 +1137,18 @@ local function compile(n, _C)
 		return { { 17, compile(n[2], C)[1] } }
 	elseif n[1] == 4 then -- function
 		local S = {}
+		local TC = {}
 		for _, a in ipairs(n[3]) do
-			table.insert(S, compile(a, C)[1])
+			local r = compile(a, TC)
+			if TC.before then
+				for _, o in ipairs(TC.before) do
+					table.insert(S, o)
+				end
+				TC.before = nil
+			end
+			for _, o in ipairs(r) do
+				table.insert(S, o)
+			end
 		end
 
 		return { { 6, n[2], S } }
@@ -1199,14 +1221,18 @@ local function compile(n, _C)
 		C.r = i
 
 		C.before = C.before or {}
-		table.insert(C.before, { 2, { { i } }, compile(n[2], C) })
-		return { { 4, { { i } } } }
+		table.insert(C.before, { 2, { { { i }, 0 } }, compile(n[2], C) })
+		return { { 4, { { { i }, 0 } } } }
 	elseif n[1] == 200 then -- path
 		local P = {}
+		local base = nil
+		if n[3] then
+			base = compile(n[3], C)[1]
+		end
 		for _, a in ipairs(n[2]) do
 			table.insert(P, compile(a, C)[1])
 		end
-		return { { 4, { P } } }
+		return { { 4, { { P, base } } } }
 	elseif n[1] == 300 then -- local
 		if not n[3] then
 			return { { 1, n[2] } }
@@ -1219,7 +1245,7 @@ local function compile(n, _C)
 
 		local p = {}
 		for _, a in ipairs(n[2]) do
-			table.insert(p, { a })
+			table.insert(p, { { a } })
 		end
 
 		return { { 1, n[2] }, { 2, p, e } }
@@ -1277,15 +1303,40 @@ local function compile(n, _C)
 		table.insert(R, r)
 		return R
 	elseif n[1] == 303 then -- While
-		error("TODO while")
+		local c = compile(n[2], C)[1]
+		local TC = {}
+		local b = {}
+		for _, a in ipairs(n[3]) do
+			local r = compile(a, TC)
+			if TC.before then
+				for _, o in ipairs(TC.before) do
+					table.insert(b, o)
+				end
+				TC.before = nil
+			end
+			for _, o in ipairs(r) do
+				table.insert(b, o)
+			end
+		end
+		return { { 10, c, b } }
 	elseif n[1] == 306 then -- d function
 		if n[2] then
 			-- local defined function
 			error("TODO")
 		end
 		local S = {}
+		local TC = {}
 		for _, a in ipairs(n[5]) do
-			table.insert(S, compile(a, C)[1])
+			local r = compile(a, TC)
+			if TC.before then
+				for _, o in ipairs(TC.before) do
+					table.insert(S, o)
+				end
+				TC.before = nil
+			end
+			for _, o in ipairs(r) do
+				table.insert(S, o)
+			end
 		end
 
 		return { { 2, { compile(n[3], C)[1][2][1] }, { { 6, n[4], S } } } }
@@ -1295,6 +1346,8 @@ local function compile(n, _C)
 			table.insert(e, compile(a, C)[1])
 		end
 		return { { 15, e } }
+	elseif n[1] == 308 then
+		return { { 16 } }
 	elseif n[1] == 310 then -- set
 		local P = {}
 		local A = {}
@@ -1312,11 +1365,11 @@ local function compile(n, _C)
 end
 
 local context = {
-	print = print
+	print = print,
 }
 
 local executor = require("executor")
-executor.execute(context, compile(ast_parse_stmt({parse[=[do print[[Hello world]] end]=],1}))[1])
+executor.execute(context, compile(ast_parse_stmt({ parse([=[do print[[Hello world]] end]=]), 1 }))[1])
 
 return {
 	parse = parse,
