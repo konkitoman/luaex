@@ -185,12 +185,11 @@ local function eval_expr(SS, entry)
 					else
 						k = P[1][p]
 					end
+					l = l[k]
+				end
 
-					if p==#P[1] then
-						table.insert(O, l[k])
-					else
-						l = l[k]
-					end
+				if l ~= SS.stack and l ~= SS.tmp then
+					table.insert(O, l)
 				end
 			end
 		end,
