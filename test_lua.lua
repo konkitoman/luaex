@@ -1,4 +1,4 @@
-local frontend = require("frontend-lua2")
+local frontend = require("frontend-lua")
 local executor = require("executor")
 
 local function show_table(table, depth)
