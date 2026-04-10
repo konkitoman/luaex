@@ -582,7 +582,9 @@ ast_parse_path_ = function(C, S)
 			if keywords[s.i] then
 				return
 			else
-				error("ident after ident that is not a keyward at: " .. s.span[1] .. "-" .. s.span[2])
+				error(
+					"<ident> after <ident> that is not a keyward at: " .. s.span[1] .. "-" .. s.span[2] .. "\n" .. s.i
+				)
 			end
 		elseif s.T == "p" then
 			if s.i == "." then
@@ -970,7 +972,92 @@ ast_parse_stmt = function(C)
 
 			return { 303, c, b }
 		elseif t.i == "for" then
-			error("TODO for")
+			C[2] = C[2] + 1
+			tok_trim(C)
+
+			local n = C[1][C[2]]
+			if not n or n.T ~= "i" then
+				error("after for an <ident> is expected")
+			end
+
+			if keywords[n.i] then
+				error("for, reservd name used: " .. n.i)
+			end
+			C[2] = C[2] + 1
+			tok_trim(C)
+
+			local a = C[1][C[2]]
+			if not a or a.T ~= "p" then
+				error("for, after parameter is expected `,` or `=`")
+			end
+
+			if a.i == "=" then
+				C[2] = C[2] + 1
+				tok_trim(C)
+
+				local e = ast_parse_expr(C)
+				if not e then
+					error("for, expect initial value of " .. n.i .. "as expresion")
+				end
+				tok_trim(C)
+				a = C[1][C[2]]
+				if not a or a.T ~= "p" then
+					error("for " .. n.i .. "=<expr>" .. "expects `,`")
+				end
+				C[2] = C[2] + 1
+				tok_trim(C)
+				local i = ast_parse_expr(C)
+				if not i then
+					error("for " .. n.i .. "=<expr>,<expr> as needs limit")
+				end
+				local m
+				tok_trim(C)
+				a = C[1][C[2]]
+				if not a then
+					error("expect `do` or `,`")
+				end
+
+				if a.T == "p" and a.i == "," then
+					C[2] = C[2] + 1
+					tok_trim(C)
+					m = ast_parse_expr(C)
+					tok_trim(C)
+					a = C[1][C[2]]
+				else
+					m = { 5, 1 }
+				end
+
+				if a.T ~= "i" or a.i ~= "do" then
+					error("expect do")
+				end
+
+				C[2] = C[2] + 1
+				tok_trim(C)
+
+				local s, l = {}, nil
+				a = C[1][C[2]]
+				while not (a.T == "i" and a.i == "end") do
+					l = ast_parse_stmt(C)
+					if not l then
+						error("for, cannot read statement")
+					end
+					table.insert(s, l)
+					tok_trim(C)
+					a = C[1][C[2]]
+				end
+				if a.T ~= "i" or a.i ~= "end" then
+					error("for, cannot found end")
+				end
+				C[2] = C[2] + 1
+
+				return { 304, n.i, e, i, m, s }
+			end
+
+			if a.i ~= "," then
+				error("unreachable, reached")
+			end
+
+			error("WTF happend, this should be unreachable")
 		elseif t.i == "repeat" then
 			error("TODO repeat")
 		elseif t.i == "break" then
@@ -1319,6 +1406,47 @@ local function compile(n, _C)
 			end
 		end
 		return { { 10, c, b } }
+	elseif n[1] == 304 then -- for
+		local O = {}
+		local TC = {}
+
+		local s = compile(n[3], TC)[1]
+		if TC.before then
+			for _, o in ipairs(TC.before) do
+				table.insert(O, o)
+			end
+			TC.before = nil
+		end
+		local e = compile(n[4], TC)[1]
+		if TC.before then
+			for _, o in ipairs(TC.before) do
+				table.insert(O, o)
+			end
+			TC.before = nil
+		end
+		local i = compile(n[5], TC)[1]
+		if TC.before then
+			for _, o in ipairs(TC.before) do
+				table.insert(O, o)
+			end
+			TC.before = nil
+		end
+		local b = {}
+		for _, l in ipairs(n[6]) do
+			local r = compile(l, TC)
+			if TC.before then
+				for _, o in ipairs(TC.before) do
+					table.insert(b, o)
+				end
+				TC.before = nil
+			end
+			for _, o in ipairs(r) do
+				table.insert(b, o)
+			end
+		end
+
+		table.insert(O, { 11, s, e, i, n[2], b })
+		return O
 	elseif n[1] == 306 then -- d function
 		if n[2] then
 			-- local defined function

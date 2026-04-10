@@ -312,6 +312,35 @@ table.insert(tests, {
 	50,
 })
 
+table.insert(tests, {
+	"IIFE, return multires",
+	[=[
+	(function()
+		local f = function()
+			return 200, 150
+		end
+		local a, b = f()
+		return a + b
+	end)()
+	]=],
+	350,
+})
+
+table.insert(tests, {
+	"IIFE, for a=1,21,1",
+	[=[
+	(function()
+		local sum, last = 0
+		for a=1,21,1 do
+			sum = sum + a;
+			last = a
+		end
+		return sum * last
+	end)()
+	]=],
+	4851,
+})
+
 local function run_test(test)
 	local name, source, result = table.unpack(test)
 	local is_ok, tokens_or_error, ast_node_or_error, bytecode_or_error, res
