@@ -162,4 +162,5 @@ But this will result in `table: {ptr hex address}`
 | 306   | d function  |
 | 307   | return      |
 | 308   | break       |
+| 309   | foreach     |
 | 310   | set         |

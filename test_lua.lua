@@ -332,13 +332,28 @@ table.insert(tests, {
 	(function()
 		local sum, last = 0
 		for a=1,21,1 do
-			sum = sum + a;
+			sum = sum + a
 			last = a
 		end
 		return sum * last
 	end)()
 	]=],
 	4851,
+})
+
+table.insert(tests, {
+	"IIFE, for k,v in {10, 20, 30}",
+	[=[
+	(function()
+		local sum, sumk = 0, 0
+		for k,v in ipairs({10, 20, 30}) do
+			sumk = sumk + k
+			sum = sum + v
+		end
+		return sum * sumk
+	end)()
+	]=],
+	360,
 })
 
 local function run_test(test)
@@ -376,7 +391,7 @@ local function run_test(test)
 		table.insert(bytecode, o)
 	end
 
-	local context = {}
+	local context = { ipairs = ipairs }
 	is_ok, res = pcall(executor.execute, context, { 6, {}, bytecode })
 	if not is_ok then
 		print("AST:", show_table(ast_node_or_error))

@@ -579,13 +579,7 @@ ast_parse_path_ = function(C, S)
 	local s = C[1][C[2]]
 	if s then
 		if s.T == "i" then
-			if keywords[s.i] then
-				return
-			else
-				error(
-					"<ident> after <ident> that is not a keyward at: " .. s.span[1] .. "-" .. s.span[2] .. "\n" .. s.i
-				)
-			end
+			return
 		elseif s.T == "p" then
 			if s.i == "." then
 				C[2] = C[2] + 1
@@ -995,8 +989,8 @@ ast_parse_stmt = function(C)
 				C[2] = C[2] + 1
 				tok_trim(C)
 
-				local e = ast_parse_expr(C)
-				if not e then
+				local s = ast_parse_expr(C)
+				if not s then
 					error("for, expect initial value of " .. n.i .. "as expresion")
 				end
 				tok_trim(C)
@@ -1006,11 +1000,11 @@ ast_parse_stmt = function(C)
 				end
 				C[2] = C[2] + 1
 				tok_trim(C)
-				local i = ast_parse_expr(C)
-				if not i then
+				local m = ast_parse_expr(C)
+				if not m then
 					error("for " .. n.i .. "=<expr>,<expr> as needs limit")
 				end
-				local m
+				local i
 				tok_trim(C)
 				a = C[1][C[2]]
 				if not a then
@@ -1020,11 +1014,11 @@ ast_parse_stmt = function(C)
 				if a.T == "p" and a.i == "," then
 					C[2] = C[2] + 1
 					tok_trim(C)
-					m = ast_parse_expr(C)
+					i = ast_parse_expr(C)
 					tok_trim(C)
 					a = C[1][C[2]]
 				else
-					m = { 5, 1 }
+					i = { 5, 1 }
 				end
 
 				if a.T ~= "i" or a.i ~= "do" then
@@ -1034,14 +1028,14 @@ ast_parse_stmt = function(C)
 				C[2] = C[2] + 1
 				tok_trim(C)
 
-				local s, l = {}, nil
+				local b, l = {}, nil
 				a = C[1][C[2]]
-				while not (a.T == "i" and a.i == "end") do
+				while a and not (a.T == "i" and a.i == "end") do
 					l = ast_parse_stmt(C)
 					if not l then
 						error("for, cannot read statement")
 					end
-					table.insert(s, l)
+					table.insert(b, l)
 					tok_trim(C)
 					a = C[1][C[2]]
 				end
@@ -1050,14 +1044,61 @@ ast_parse_stmt = function(C)
 				end
 				C[2] = C[2] + 1
 
-				return { 304, n.i, e, i, m, s }
+				return { 304, n.i, s, m, i, b }
 			end
 
-			if a.i ~= "," then
-				error("unreachable, reached")
+			local k = { n.i }
+			while a and (a.T == "p" and a.i == ",") do
+				C[2] = C[2] + 1
+				tok_trim(C)
+				a = C[1][C[2]]
+				if not a or a.T ~= "i" then
+					error("Expected <ident> for `for` parameter name")
+				end
+				if keywords[a.i] then
+					error("reserved keyword used as paremeter name in for")
+				end
+				table.insert(k, a.i)
+				C[2] = C[2] + 1
+				tok_trim(C)
+				a = C[1][C[2]]
 			end
 
-			error("WTF happend, this should be unreachable")
+			if not a or a.T ~= "i" or a.i ~= "in" then
+				error("after for parameters, an `in` is expected!")
+			end
+			C[2] = C[2] + 1
+			tok_trim(C)
+			local e = ast_parse_expr(C)
+			if not e then
+				error("for, after `in` is expected an expression!")
+			end
+			tok_trim(C)
+			a = C[1][C[2]]
+			if a.T ~= "i" or a.i ~= "do" then
+				error("after for expression, `do` is expected!")
+			end
+			C[2] = C[2] + 1
+			tok_trim(C)
+			a = C[1][C[2]]
+
+			local b, l = {}, nil
+			while a and not (a.T == "i" and a.i == "end") do
+				l = ast_parse_stmt(C)
+				if not l then
+					error("for, cannot read statement!")
+				end
+				table.insert(b, l)
+				tok_trim(C)
+				a = C[1][C[2]]
+			end
+
+			if not a or a.T ~= "i" or a.i ~= "end" then
+				error("for, cannot find end")
+			end
+			C[2] = C[2] + 1
+
+			return { 309, k, e, b }
 		elseif t.i == "repeat" then
 			error("TODO repeat")
 		elseif t.i == "break" then
@@ -1474,8 +1515,24 @@ local function compile(n, _C)
 			table.insert(e, compile(a, C)[1])
 		end
 		return { { 15, e } }
-	elseif n[1] == 308 then
+	elseif n[1] == 308 then -- break
 		return { { 16 } }
+	elseif n[1] == 309 then -- foreach
+		local TC, b, r = {}, {}, nil
+		local e = compile(n[3], C)[1]
+		for _, s in ipairs(n[4]) do
+			r = compile(s, TC)
+			if TC.before then
+				for _, o in ipairs(TC.before) do
+					table.insert(b, o)
+				end
+				TC.before = nil
+			end
+			for _, o in ipairs(r) do
+				table.insert(b, o)
+			end
+		end
+		return { { 12, e, n[2], b } }
 	elseif n[1] == 310 then -- set
 		local P = {}
 		local A = {}
