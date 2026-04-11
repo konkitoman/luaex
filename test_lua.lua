@@ -356,6 +356,37 @@ table.insert(tests, {
 	360,
 })
 
+table.insert(tests, {
+	"IIFE, repeat",
+	[=[
+	(function()
+		local sum = 0
+		repeat
+			sum = sum + 1
+		until sum == 10
+		return sum
+	end)()
+	]=],
+	10,
+})
+
+table.insert(tests, {
+	"IIFE, repeat, break",
+	[=[
+	(function()
+		local sum = 0
+		repeat
+			sum = sum + 1
+			if sum == 5 then
+				break
+			end
+		until sum == 10
+		return sum
+	end)()
+	]=],
+	5,
+})
+
 local function run_test(test)
 	local name, source, result = table.unpack(test)
 	local is_ok, tokens_or_error, ast_node_or_error, bytecode_or_error, res

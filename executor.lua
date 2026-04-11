@@ -322,6 +322,7 @@ local function eval_expr(SS, entry)
 					eval_expr(LS, entry[3][i])
 					if not LS:evaluate() then break end
 				end
+				if LS:is_break() then break end
 			until eval_expr(LS, entry[2])[1]
 		end,
 		function() -- 14 Do

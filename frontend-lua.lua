@@ -1100,7 +1100,30 @@ ast_parse_stmt = function(C)
 
 			return { 309, k, e, b }
 		elseif t.i == "repeat" then
-			error("TODO repeat")
+			C[2] = C[2] + 1
+			tok_trim(C)
+			local b, a, e, l = {}, nil, nil, nil
+			a = C[1][C[2]]
+			while a and not (a.T == "i" and a.i == "until") do
+				l = ast_parse_stmt(C)
+				if not l then
+					error("repeat, cannot read statement")
+				end
+				table.insert(b, l)
+				tok_trim(C)
+				a = C[1][C[2]]
+			end
+			if not a or a.T ~= "i" or a.i ~= "until" then
+				error("repeat, is expected to end with until")
+			end
+			C[2] = C[2] + 1
+			tok_trim(C)
+			e = ast_parse_expr(C)
+			if not e then
+				error("repeat, cannot read until expression")
+			end
+
+			return { 305, e, b }
 		elseif t.i == "break" then
 			C[2] = C[2] + 1
 			return { 308, span = t.span }
@@ -1488,6 +1511,29 @@ local function compile(n, _C)
 
 		table.insert(O, { 11, s, e, i, n[2], b })
 		return O
+	elseif n[1] == 305 then -- repeat
+		local TC, b = {}, {}
+		for _, s in ipairs(n[3]) do
+			local r = compile(s, TC)
+			if TC.before then
+				for _, o in ipairs(TC.before) do
+					table.insert(b, o)
+				end
+				TC.before = nil
+			end
+			for _, o in ipairs(r) do
+				table.insert(b, o)
+			end
+		end
+		local e = compile(n[2], TC)[1]
+		if TC.before then
+			for _, o in ipairs(TC.before) do
+				table.insert(b, o)
+			end
+			TC.before = nil
+		end
+
+		return { { 13, e, b } }
 	elseif n[1] == 306 then -- d function
 		if n[2] then
 			-- local defined function
