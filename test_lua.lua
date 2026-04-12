@@ -387,6 +387,19 @@ table.insert(tests, {
 	5,
 })
 
+table.insert(tests, {
+	"IIFE, f()[1]",
+	[=[
+	(function()
+		local data = { 0 }
+		local f = function() return data end
+		f()[1] = 21
+		return data[1]
+	end)()
+	]=],
+	21,
+})
+
 local function run_test(test)
 	local name, source, result = table.unpack(test)
 	local is_ok, tokens_or_error, ast_node_or_error, bytecode_or_error, res

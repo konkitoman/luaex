@@ -626,7 +626,19 @@ ast_parse_path = function(C)
 		return r
 	end
 
-	return { 200, { { 6, t.i, span = t.span } }, span = t.span }
+	local o = { 200, { { 6, t.i, span = t.span } }, span = t.span }
+	local S = C[2]
+	local c = ast_parse_call(C, o)
+	if c then
+		local s = ast_parse_path_(C, C[2])
+		if s then
+			s[3] = c
+			return s
+		end
+	end
+
+	C[2] = S
+	return o
 end
 ast_parse_table = function(C)
 	local S = C[2]
