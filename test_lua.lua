@@ -400,6 +400,24 @@ table.insert(tests, {
 	21,
 })
 
+table.insert(tests, {
+	'table, {["a"] = 32}',
+	[=[({["a"] = 32}).a]=],
+	32,
+})
+
+table.insert(tests, {
+	"table, {a = 32}",
+	[=[({a = 32}).a]=],
+	32,
+})
+
+table.insert(tests, {
+	"table, {32, 64, 128}",
+	[=[({32, 64, 128})[2]]=],
+	64,
+})
+
 local function run_test(test)
 	local name, source, result = table.unpack(test)
 	local is_ok, tokens_or_error, ast_node_or_error, bytecode_or_error, res

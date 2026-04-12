@@ -261,6 +261,7 @@ local ast_parse_path
 local ast_parse_expr
 local ast_parse_call
 local ast_parse_table
+local ast_parse_path_
 local function ast_parse_expr_(C)
 	local t = C[1][C[2]]
 	if not t then
@@ -362,14 +363,35 @@ local function ast_parse_expr_(C)
 			error("Unknown literal at: " .. t.span[1] .. "-" .. t.span[2])
 		end
 	elseif t.T == "p" then
-		if t.i == ")" then
-			return
-		elseif t.i == "{" then
+		if t.i == "{" then
 			local T = ast_parse_table(C)
 			if not T then
 				error("Cannot parse table")
 			end
 			return T
+		elseif t.i == "(" then
+			C[2] = C[2] + 1
+			tok_trim(C)
+			local a = C[1][C[2]]
+			if not a or (a.T == "p" and a.i == ")") then
+				error("a group needs to have an expression inside it")
+			end
+			local e = ast_parse_expr(C)
+			tok_trim(C)
+			a = C[1][C[2]]
+			if not a or a.T ~= "p" or a.i ~= ")" then
+				error("A group needs to end!")
+			end
+			C[2] = C[2] + 1
+			tok_trim(C)
+			local S = C[2]
+			local p = ast_parse_path_(C, S)
+			if p then
+				p[3] = e
+				return p
+			end
+			C[2] = S
+			return { 100, e, span = { t.span[1], e.span[2] } }
 		end
 
 		C[2] = C[2] + 1
@@ -404,12 +426,6 @@ local function ast_parse_expr_(C)
 				error("Invalid `~` no right: " .. t.span[1] .. "-")
 			end
 			return { 52, r, span = { t.span[1], r.span[2] } }
-		elseif t.i == "(" then
-			if not r then
-				error("Invalid `~` no right: " .. t.span[1] .. "-")
-			end
-			C[2] = C[2] + 1
-			return { 100, r, span = { t.span[1], r.span[2] } }
 		end
 	end
 end
@@ -567,13 +583,13 @@ ast_parse_expr = function(C)
 			end
 			return ast_expr_apply_precedence({ 34, l, r, span = { l.span[1], r.span[2] } })
 		elseif t.i == "(" then
+			print("Function")
 		end
 	end
 	C[2] = S
 	return l
 end
 
-local ast_parse_path_
 ast_parse_path_ = function(C, S)
 	tok_trim(C)
 	local s = C[1][C[2]]
@@ -694,7 +710,7 @@ ast_parse_table = function(C)
 				if a.T == "p" and a.i == "=" then
 					C[2] = C[2] + 1
 					local r = ast_parse_expr(C)
-					table.insert(k, l)
+					table.insert(k, l[2][1])
 					table.insert(v, r)
 					tok_trim(C)
 					a = C[1][C[2]]
@@ -729,18 +745,23 @@ end
 local function ast_parse_call_(C, p, P)
 	local S, E = C[2], 0
 	local a = C[1][C[2]]
+	if not a then
+		return
+	end
 	if a.T == "p" and a.i == "(" then
 		local e = nil
-		repeat
-			C[2] = C[2] + 1
+		C[2] = C[2] + 1
+		tok_trim(C)
+		a = C[1][C[2]]
+		while a and not (a.T == "p" and a.i == ")") do
 			e = ast_parse_expr(C)
 			if e then
 				table.insert(P, e)
 			end
 			tok_trim(C)
 			a = C[1][C[2]]
-		until not a or (a.T == "p" and a.i == ")")
-		if not a then
+		end
+		if not a or a.T ~= "p" or a.i ~= ")" then
 			error("Unclosed call")
 		end
 		E = a.span[2]
@@ -762,7 +783,7 @@ end
 
 ast_parse_call = function(C, p)
 	local a = C[1][C[2]]
-	if a.T == "p" and a.i == ":" then
+	if a and a.T == "p" and a.i == ":" then
 		C[2] = C[2] + 1
 		tok_trim(C)
 		a = C[1][C[2]]
