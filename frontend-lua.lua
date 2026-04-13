@@ -298,19 +298,34 @@ local function ast_parse_expr_(C)
 				C[2] = C[2] + 1
 				tok_trim(C)
 				k = C[1][C[2]]
-				if k and k.T == "p" and k.i == ")" then
-					break
+				if not k then
+					error("Expect function parameters to end with `)`")
 				end
-				if not k.T == "i" then
+				if k.T == "p" and k.i == ")" then
+					break
+				elseif k.T == 'p' and k.i == '.' then
+					k = C[1][C[2] + 1]
+					if not k or k.T ~= 'p' or k.i ~= '.' then
+						error("A unexpected `.` in function parameters")
+					end
+					k = C[1][C[2] + 2]
+					if not k or k.T ~= 'p' or k.i ~= '.' then
+						error("A unexpected `..` in function parameters")
+					end
+					C[2] = C[2] + 3
+					tok_trim(C)
+					k = C[1][C[2]]
+				elseif k.T == 'i' then
+					table.insert(a, k.i)
+					C[2] = C[2] + 1
+					tok_trim(C)
+					k = C[1][C[2]]
+				else
 					error("Expecting an ident for the function paramenters")
 				end
-				table.insert(a, k.i)
-				C[2] = C[2] + 1
-				tok_trim(C)
-				k = C[1][C[2]]
 				if k.T == "p" and k.i == ")" then
 				elseif not (k.T == "p" and k.i == ",") then
-					error("No `,` between parameters, `,` is required to separate aparameters")
+					error("No `,` between parameters, `,` is required to separate aparameters, at token: " .. C[2])
 				end
 			until not k or (k.T == "p" and k.i == ")")
 			if not k or not (k.T == "p" and k.i == ")") then
@@ -602,7 +617,7 @@ ast_parse_path_ = function(C, S)
 				tok_trim(C)
 				local l = ast_parse_path(C)
 				if not l then
-					error("Cannot read path at: " .. S .. "-" .. s.span[2])
+					return
 				end
 				return l
 			elseif s.i == "[" then
@@ -760,6 +775,10 @@ local function ast_parse_call_(C, p, P)
 			end
 			tok_trim(C)
 			a = C[1][C[2]]
+			if a.T == "p" and a.i == ',' then
+				C[2] = C[2] + 1
+				tok_trim(C)
+			end
 		end
 		if not a or a.T ~= "p" or a.i ~= ")" then
 			error("Unclosed call")
@@ -791,7 +810,7 @@ ast_parse_call = function(C, p)
 			error("Invalid call with :")
 		end
 		local P = p
-		p = { P[1], {}, p[2], span = { P.span[1], a.span[2] } }
+		p = { P[1], {}, span = { P.span[1], a.span[2] } }
 		for _, x in ipairs(P[2]) do
 			table.insert(p[2], x)
 		end
@@ -801,6 +820,111 @@ ast_parse_call = function(C, p)
 	else
 		return ast_parse_call_(C, p, {})
 	end
+end
+
+local parse_function = function(C, is_local)
+	local t, k = C[1][C[2]], nil
+	if not t or t.T ~= 'i' or t.i ~= 'function' then
+		error("parse_function was called when there is not function!")
+	end
+
+	C[2] = C[2] + 1
+	tok_trim(C)
+	local a = {}
+	local P
+	if is_local then
+		t = C[1][C[2]]
+		if not t or t.T ~= 'i' then
+			error("Expect <ident> after `local function `")
+		end
+
+		if keywords[t.i] then
+			error("keyward used as the function name for `local function`: " .. t.i)
+		end
+
+		P = t.i
+		C[2] = C[2] + 1
+	else
+		P = ast_parse_path(C)
+		if not P then
+			error("Cannot read function definition path")
+		end
+		tok_trim(C)
+		local k = C[1][C[2]]
+		if k.T == "p" then
+			if k.i == ":" then
+				C[2] = C[2] + 1
+				tok_trim(C)
+				k = C[1][C[2]]
+				if k.T ~= "i" then
+					error("expect function name, ident")
+				end
+
+				if keywords[k.i] then
+					error("recerved keyword used as function name")
+				end
+				table.insert(a, "self")
+				table.insert(P[2], { 6, k.i, span = k.span })
+
+				C[2] = C[2] + 1
+			end
+		end
+	end
+
+	tok_trim(C)
+	k = C[1][C[2]]
+	if not k or not (k.T == "p" and k.i == "(") then
+		error("Function definition expects the paramenters to begin wtih `(`")
+	end
+	repeat
+		C[2] = C[2] + 1
+		tok_trim(C)
+		k = C[1][C[2]]
+		if k and k.T == "p" and k.i == ")" then
+			break
+		end
+		if not k or not k.T == "i" then
+			error("Expecting an ident for the function paramenters")
+		end
+		table.insert(a, k.i)
+		C[2] = C[2] + 1
+		tok_trim(C)
+		k = C[1][C[2]]
+		if k.T == "p" and k.i == ")" then
+		elseif not (k.T == "p" and k.i == ",") then
+			error("No `,` between parameters, `,` is required to separate aparameters")
+		end
+	until not k or (k.T == "p" and k.i == ")")
+	if not k or not (k.T == "p" and k.i == ")") then
+		error("Cannot find function parameters end, `)`")
+	end
+
+	C[2] = C[2] + 1
+
+	local s = {}
+	repeat
+		tok_trim(C)
+		k = C[1][C[2]]
+		while k and k.T == "p" and k.i == ";" do
+			C[2] = C[2] + 1
+			tok_trim(C)
+			k = C[1][C[2]]
+		end
+		if not k or k.T == "i" and k.i == "end" then
+			break
+		end
+		local r = ast_parse_stmt(C)
+		if not r then
+			error("Cannot read statement in function body")
+		end
+		table.insert(s, r)
+	until false
+	if not k or not (k.T == "i" or k.i == "end") then
+		error("Function without end")
+	end
+	C[2] = C[2] + 1
+
+	return { 306, is_local, P, a, s }
 end
 
 ast_parse_stmt = function(C)
@@ -828,7 +952,9 @@ ast_parse_stmt = function(C)
 				end
 				E = a.span[2]
 				if a.T == "i" then
-					if keywords[a.i] then
+					if a.i == "function" then
+						return parse_function(C, true)
+					elseif keywords[a.i] then
 						if #D == 0 then
 							error("Local expects at least one name")
 						else
@@ -1177,90 +1303,12 @@ ast_parse_stmt = function(C)
 					break
 				end
 			until not a or (a.T == "i" and keywords[a.i]) or (a.T == "p" and a.i == ";")
+			if not a then
+				a = t
+			end
 			return { 307, e, span = { t.span[1], a.span[2] } }
 		elseif t.i == "function" then
-			C[2] = C[2] + 1
-			tok_trim(C)
-			local P = ast_parse_path(C)
-			if not P then
-				error("Cannot read function definition path")
-			end
-
-			local a = {}
-			tok_trim(C)
-			local k = C[1][C[2]]
-			if k.T == "p" then
-				if k.i == ":" then
-					C[2] = C[2] + 1
-					tok_trim(C)
-					k = C[1][C[2]]
-					if k.T ~= "i" then
-						error("expect function name, ident")
-					end
-
-					if keywords[k.i] then
-						error("recerved keyword used as function name")
-					end
-					table.insert(a, "self")
-					table.insert(P[2], { 6, k.i, span = k.span })
-
-					C[2] = C[2] + 1
-				end
-			end
-			tok_trim(C)
-			k = C[1][C[2]]
-			if not (k.T == "p" and k.i == "(") then
-				error("Function definition expects the paramenters to begin wtih `(`")
-			end
-			repeat
-				C[2] = C[2] + 1
-				tok_trim(C)
-				k = C[1][C[2]]
-				if k and k.T == "p" and k.i == ")" then
-					break
-				end
-				if not k.T == "i" then
-					error("Expecting an ident for the function paramenters")
-				end
-				table.insert(a, k.i)
-				C[2] = C[2] + 1
-				tok_trim(C)
-				k = C[1][C[2]]
-				if k.T == "p" and k.i == ")" then
-				elseif not (k.T == "p" and k.i == ",") then
-					error("No `,` between parameters, `,` is required to separate aparameters")
-				end
-			until not k or (k.T == "p" and k.i == ")")
-			if not k or not (k.T == "p" and k.i == ")") then
-				error("Cannot find function parameters end, `)`")
-			end
-
-			C[2] = C[2] + 1
-
-			local s = {}
-			repeat
-				tok_trim(C)
-				k = C[1][C[2]]
-				while k and k.T == "p" and k.i == ";" do
-					C[2] = C[2] + 1
-					tok_trim(C)
-					k = C[1][C[2]]
-				end
-				if not k or k.T == "i" and k.i == "end" then
-					break
-				end
-				local r = ast_parse_stmt(C)
-				if not r then
-					error("Cannot read statement in function body")
-				end
-				table.insert(s, r)
-			until false
-			if not k or not (k.T == "i" or k.i == "end") then
-				error("Function without end")
-			end
-			C[2] = C[2] + 1
-
-			return { 306, false, P, a, s }
+			return parse_function(C, false)
 		else
 			local S, E = t.span[1], t.span[2]
 			local L = {}
@@ -1407,6 +1455,8 @@ local function compile(n, _C)
 		C.before = C.before or {}
 		table.insert(C.before, { 2, { { { i }, 0 } }, compile(n[2], C) })
 		return { { 4, { { { i }, 0 } } } }
+	elseif n[1] == 101 then -- variadic
+		return { {5} }
 	elseif n[1] == 200 then -- path
 		local P = {}
 		local base = nil
@@ -1568,10 +1618,6 @@ local function compile(n, _C)
 
 		return { { 13, e, b } }
 	elseif n[1] == 306 then -- d function
-		if n[2] then
-			-- local defined function
-			error("TODO")
-		end
 		local S = {}
 		local TC = {}
 		for _, a in ipairs(n[5]) do
@@ -1585,6 +1631,9 @@ local function compile(n, _C)
 			for _, o in ipairs(r) do
 				table.insert(S, o)
 			end
+		end
+		if n[2] then
+			return { { 1, { n[3] } }, { 2, { { { n[3] } } }, { { 6, n[4], S } } } }
 		end
 
 		return { { 2, { compile(n[3], C)[1][2][1] }, { { 6, n[4], S } } } }

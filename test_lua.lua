@@ -401,6 +401,46 @@ table.insert(tests, {
 })
 
 table.insert(tests, {
+	"IIFE, self",
+	[=[
+	(function()
+		local a = { a = 2 }
+		a.test = function(self)
+			return self.a
+		end
+		return a:test()
+	end)()
+	]=],
+	2,
+})
+
+table.insert(tests, {
+	"IIFE, self",
+	[=[
+	(function()
+		local function testing(p)
+			return p
+		end
+		return testing(41)
+	end)()
+	]=],
+	41,
+})
+
+table.insert(tests, {
+	"IIFE, multiarg",
+	[=[
+	(function()
+		local function testing(a, b)
+			return a + b
+		end
+		return testing(10, 20)
+	end)()
+	]=],
+	30,
+})
+
+table.insert(tests, {
 	'table, {["a"] = 32}',
 	[=[({["a"] = 32}).a]=],
 	32,
