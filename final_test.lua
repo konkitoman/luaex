@@ -6,7 +6,7 @@ local source = [=[
 
 (function()
 
-function create_stack(parent)
+local function create_stack(parent)
 	local stack = {}
 	local stack_state = {
 		stack = stack,
@@ -33,7 +33,7 @@ function create_stack(parent)
 	return stack_state
 end
 
-function stack_push_fn(parent_stack)
+local function stack_push_fn(parent_stack)
 	local stack = {}
 	local fn_state = {}
 	local stack_state = {
@@ -62,7 +62,7 @@ function stack_push_fn(parent_stack)
 	return stack_state
 end
 
-function stack_push_do(parent_stack)
+local function stack_push_do(parent_stack)
 	local stack = {}
 	local stack_state = {
 		stack = stack,
@@ -90,7 +90,7 @@ function stack_push_do(parent_stack)
 	return stack_state
 end
 
-function stack_push_loop(parent_stack)
+local function stack_push_loop(parent_stack)
 	local stack = {}
 
 	local loop_state = {}
@@ -118,7 +118,7 @@ function stack_push_loop(parent_stack)
 	return stack_state
 end
 
-function eval_expr(SS, entry)
+local function eval_expr(SS, entry)
 	if not SS:evaluate() then return end
 
 	local O = {}
@@ -479,7 +479,7 @@ function eval_expr(SS, entry)
 	return O
 end
 
-function execute(context, expr)
+local function execute(context, expr)
 	local stack = create_stack(context)
 	return table.unpack(eval_expr(stack, expr))
 end
