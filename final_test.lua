@@ -512,30 +512,18 @@ end
 
 local tokens = frontend.parse(source)
 local ast_node = frontend.ast_parse_expr(tokens)
-local TC = {}
-local bytecode = {}
-local r_bytecode = frontend.compile(ast_node, TC)
-if TC.before then
-  for _, o in ipairs(TC.before) do
-    table.insert(bytecode, o)
-  end
-  TC.before = nil
-end
-for _, o in ipairs(r_bytecode) do
-  table.insert(bytecode, o)
-end
+local bytecode = frontend.compile_to_function(ast_node)
 -- print(show_table(bytecode))
 
 local context = {
-  print = print,
-  table = table,
-  type = type,
-  pcall = pcall,
-  error = error,
-  assert = assert,
-  setmetatable = setmetatable
+	print = print,
+	table = table,
+	type = type,
+	pcall = pcall,
+	error = error,
+	assert = assert,
+	setmetatable = setmetatable,
 }
 
-local f = executor.execute(context, {6, {}, bytecode})()
-print(f.execute(context, { 8, { 4, { { { "print" } } } }, { { 7, "Hello World" } }}))
-
+local f = executor.execute(context, bytecode)()
+print(f.execute(context, { 8, { 4, { { { "print" } } } }, { { 7, "Hello World" } } }))

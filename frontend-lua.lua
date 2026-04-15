@@ -303,19 +303,19 @@ local function ast_parse_expr_(C)
 				end
 				if k.T == "p" and k.i == ")" then
 					break
-				elseif k.T == 'p' and k.i == '.' then
+				elseif k.T == "p" and k.i == "." then
 					k = C[1][C[2] + 1]
-					if not k or k.T ~= 'p' or k.i ~= '.' then
+					if not k or k.T ~= "p" or k.i ~= "." then
 						error("A unexpected `.` in function parameters")
 					end
 					k = C[1][C[2] + 2]
-					if not k or k.T ~= 'p' or k.i ~= '.' then
+					if not k or k.T ~= "p" or k.i ~= "." then
 						error("A unexpected `..` in function parameters")
 					end
 					C[2] = C[2] + 3
 					tok_trim(C)
 					k = C[1][C[2]]
-				elseif k.T == 'i' then
+				elseif k.T == "i" then
 					table.insert(a, k.i)
 					C[2] = C[2] + 1
 					tok_trim(C)
@@ -775,7 +775,7 @@ local function ast_parse_call_(C, p, P)
 			end
 			tok_trim(C)
 			a = C[1][C[2]]
-			if a.T == "p" and a.i == ',' then
+			if a.T == "p" and a.i == "," then
 				C[2] = C[2] + 1
 				tok_trim(C)
 			end
@@ -824,7 +824,7 @@ end
 
 local parse_function = function(C, is_local)
 	local t, k = C[1][C[2]], nil
-	if not t or t.T ~= 'i' or t.i ~= 'function' then
+	if not t or t.T ~= "i" or t.i ~= "function" then
 		error("parse_function was called when there is not function!")
 	end
 
@@ -834,7 +834,7 @@ local parse_function = function(C, is_local)
 	local P
 	if is_local then
 		t = C[1][C[2]]
-		if not t or t.T ~= 'i' then
+		if not t or t.T ~= "i" then
 			error("Expect <ident> after `local function `")
 		end
 
@@ -1456,7 +1456,7 @@ local function compile(n, _C)
 		table.insert(C.before, { 2, { { { i }, 0 } }, compile(n[2], C) })
 		return { { 4, { { { i }, 0 } } } }
 	elseif n[1] == 101 then -- variadic
-		return { {5} }
+		return { { 5 } }
 	elseif n[1] == 200 then -- path
 		local P = {}
 		local base = nil
@@ -1686,4 +1686,18 @@ return {
 		return ast_parse_stmt({ tokens, 1 })
 	end,
 	compile = compile,
+	compile_to_function = function(ast_node)
+		local TC = {}
+		local bytecode = {}
+		local r = compile(ast_node, TC)
+		if TC.before then
+			for _, o in ipairs(TC.before) do
+				table.insert(bytecode, o)
+			end
+		end
+		for _, o in ipairs(r) do
+			table.insert(bytecode, o)
+		end
+		return { 6, {}, bytecode }
+	end,
 }
