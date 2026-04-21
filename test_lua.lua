@@ -458,6 +458,29 @@ table.insert(tests, {
 	64,
 })
 
+table.insert(tests, {
+	"IIFE, call with self",
+	[=[
+	(function()
+	local m1, m2, i = {a = 2}, {b = 32}, 1
+	local function get()
+	  local t = i
+	  i = 1 + (i % 2)
+	  return ({m1, m2})[t]
+	end
+	function m1:data()
+	  return self.a
+	end
+	function m2:data()
+	  return self.b
+	end
+
+	return get():data() * (get()):data()
+	end)()
+	]=],
+	64,
+})
+
 local function run_test(test)
 	local name, source, result = table.unpack(test)
 	local is_ok, tokens_or_error, ast_node_or_error, bytecode_or_error, res

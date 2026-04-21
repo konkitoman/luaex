@@ -348,7 +348,7 @@ local function ast_parse_expr_(C)
 				end
 				local r = ast_parse_stmt(C)
 				if not r then
-					error("Cannot read statement in function body")
+					error("Cannot read statement in function body: " .. C[2])
 				end
 				table.insert(s, r)
 			until false
@@ -597,8 +597,6 @@ ast_parse_expr = function(C)
 				error("Invalid `|` expresion no, right at: " .. t.span[1] .. "-")
 			end
 			return ast_expr_apply_precedence({ 34, l, r, span = { l.span[1], r.span[2] } })
-		elseif t.i == "(" then
-			print("Function")
 		end
 	end
 	C[2] = S
@@ -757,12 +755,13 @@ ast_parse_table = function(C)
 	return { 7, k, v, span = { S, a.span[2] } }
 end
 
-local function ast_parse_call_(C, p, P)
+local function ast_parse_call_(C, p)
 	local S, E = C[2], 0
 	local a = C[1][C[2]]
 	if not a then
 		return
 	end
+	local P = {}
 	if a.T == "p" and a.i == "(" then
 		local e = nil
 		C[2] = C[2] + 1
@@ -809,16 +808,38 @@ ast_parse_call = function(C, p)
 		if not a or a.T ~= "i" then
 			error("Invalid call with :")
 		end
-		local P = p
-		p = { P[1], {}, span = { P.span[1], a.span[2] } }
-		for _, x in ipairs(P[2]) do
-			table.insert(p[2], x)
-		end
-		table.insert(p[2], { 6, a.i, span = a.span })
 		C[2] = C[2] + 1
-		return ast_parse_call_(C, p, { P })
+		local r = ast_parse_call_(C, p)
+		return { 9, p, a, r[3], span = { a.span[1], r.span[2] } }
 	else
-		return ast_parse_call_(C, p, {})
+		local S = C[2]
+		local r = ast_parse_call_(C, p)
+		if not r then
+			C[2] = S
+			return
+		end
+		local s = C[2]
+		local t = ast_parse_path_(C, s)
+		if not t then
+			s = C[2]
+			t = ast_parse_call(C, { 200, {}, r })
+			if t then
+				return t
+			end
+			C[2] = s
+			return r
+		end
+		S = C[2]
+		t[3] = r
+		tok_trim(C)
+		t = ast_parse_call(C, t)
+		if not t then
+			C[2] = s
+			return r
+		end
+
+		C[2] = s
+		return g
 	end
 end
 
@@ -1409,6 +1430,17 @@ local function compile(n, _C)
 			table.insert(v, compile(a, C)[1])
 		end
 		return { { 3, k, v } }
+	elseif n[1] == 9 then -- call self
+		local p = compile(n[2], C)[1]
+		local i = (C.r or 0) + 1
+		C.r = i
+		C.before = C.before or {}
+		table.insert(C.before, { 2, { { { i }, 0 } }, { p } })
+		local A = { { 4, { { { i }, 0 } } } }
+		for _, a in ipairs(n[4]) do
+			table.insert(A, compile(a, C)[1])
+		end
+		return { { 8, { 4, { { { i, n[3].i }, 0 } } }, A } }
 	elseif n[1] == 10 then -- call
 		local P = compile(n[2], C)[1]
 		local A = {}
