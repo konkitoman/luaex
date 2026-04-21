@@ -1354,6 +1354,22 @@ ast_parse_stmt = function(C)
 	end
 end
 
+local function ast_parse_module(tokens)
+	local C = { tokens, 1 }
+	local b = {}
+	tok_trim(C)
+	while C[2] <= #C[1] do
+		local stmt = ast_parse_stmt(C)
+		tok_trim(C)
+		if not stmt then
+			error("Cannot read statement!")
+		end
+		table.insert(b, stmt)
+	end
+
+	return { 4, {}, b }
+end
+
 local function compile(n, _C)
 	local C = _C or {}
 
@@ -1682,6 +1698,7 @@ return {
 	ast_parse_expr = function(tokens)
 		return ast_parse_expr({ tokens, 1 })
 	end,
+	ast_parse_module = ast_parse_module,
 	ast_parse_stmt = function(tokens)
 		return ast_parse_stmt({ tokens, 1 })
 	end,
