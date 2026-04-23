@@ -1711,9 +1711,7 @@ return {
 				table.insert(bytecode, o)
 			end
 		end
-		for _, o in ipairs(r) do
-			table.insert(bytecode, o)
-		end
+		table.insert(bytecode, r)
 		return { 6, {}, bytecode }
 	end,
 }

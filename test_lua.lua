@@ -498,27 +498,19 @@ local function run_test(test)
 		return false
 	end
 
-	local C, bytecode = {}, {}
-
-	is_ok, bytecode_or_error = pcall(frontend.compile, ast_node_or_error, C)
+	is_ok, bytecode_or_error = pcall(frontend.compile_to_function, ast_node_or_error)
 	if not is_ok then
 		print("AST:", show_table(ast_node_or_error))
 		print("\tError while compiling ast_node")
 		print("\t" .. bytecode_or_error)
 		return false
 	end
-	if C.before then
-		for _, o in ipairs(C.before) do
-			table.insert(bytecode, o)
-		end
-	end
-	table.insert(bytecode, bytecode_or_error)
 
 	local context = { ipairs = ipairs }
-	is_ok, res = pcall(executor.execute, context, { 6, {}, bytecode })
+	is_ok, res = pcall(executor.execute, context, bytecode_or_error)
 	if not is_ok then
 		print("AST:", show_table(ast_node_or_error))
-		print("Bytecode:", show_table(bytecode))
+		print("Bytecode:", show_table(bytecode_or_error))
 		print("\tError while executing")
 		print("\t" .. res)
 		return false
