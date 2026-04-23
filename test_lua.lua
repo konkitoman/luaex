@@ -512,9 +512,7 @@ local function run_test(test)
 			table.insert(bytecode, o)
 		end
 	end
-	for _, o in ipairs(bytecode_or_error) do
-		table.insert(bytecode, o)
-	end
+	table.insert(bytecode, bytecode_or_error)
 
 	local context = { ipairs = ipairs }
 	is_ok, res = pcall(executor.execute, context, { 6, {}, bytecode })

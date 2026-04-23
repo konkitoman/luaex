@@ -1395,15 +1395,15 @@ local function compile(n, _C)
 	local C = _C or {}
 
 	if n[1] == 5 or n[1] == 6 then
-		return { { 7, n[2] } }
+		return { 7, n[2] }
 	elseif n[1] == 0 then -- nil
-		return { { 7 } }
+		return { 7 }
 	elseif n[1] == 1 then -- false
-		return { { 7, false } }
+		return { 7, false }
 	elseif n[1] == 2 then -- true
-		return { { 7, true } }
+		return { 7, true }
 	elseif n[1] == 3 then -- not
-		return { { 17, compile(n[2], C)[1] } }
+		return { 17, compile(n[2], C) }
 	elseif n[1] == 4 then -- function
 		local S = {}
 		local TC = {}
@@ -1415,153 +1415,150 @@ local function compile(n, _C)
 				end
 				TC.before = nil
 			end
-			for _, o in ipairs(r) do
-				table.insert(S, o)
-			end
+			table.insert(S, r)
 		end
 
-		return { { 6, n[2], S } }
+		return { 6, n[2], S }
 	elseif n[1] == 7 then -- table
 		local k, v = {}, {}
 		for _, a in ipairs(n[2]) do
-			table.insert(k, compile(a, C)[1])
+			table.insert(k, compile(a, C))
 		end
 		for _, a in ipairs(n[3]) do
-			table.insert(v, compile(a, C)[1])
+			table.insert(v, compile(a, C))
 		end
-		return { { 3, k, v } }
+		return { 3, k, v }
 	elseif n[1] == 9 then -- call self
-		local p = compile(n[2], C)[1]
+		local p = compile(n[2], C)
 		local i = (C.r or 0) + 1
 		C.r = i
 		C.before = C.before or {}
 		table.insert(C.before, { 2, { { { i }, 0 } }, { p } })
 		local A = { { 4, { { { i }, 0 } } } }
 		for _, a in ipairs(n[4]) do
-			table.insert(A, compile(a, C)[1])
+			table.insert(A, compile(a, C))
 		end
-		return { { 8, { 4, { { { i, n[3].i }, 0 } } }, A } }
+		return { 8, { 4, { { { i, n[3].i }, 0 } } }, A }
 	elseif n[1] == 10 then -- call
-		local P = compile(n[2], C)[1]
+		local P = compile(n[2], C)
 		local A = {}
 		for _, a in ipairs(n[3]) do
-			table.insert(A, compile(a, C)[1])
+			table.insert(A, compile(a, C))
 		end
-		return { { 8, P, A } }
+		return { 8, P, A }
 	elseif n[1] == 11 then -- and
-		return { { 40, compile(n[2], C)[1], compile(n[3], C)[1] } }
+		return { 40, compile(n[2], C), compile(n[3], C) }
 	elseif n[1] == 12 then -- or
-		return { { 39, compile(n[2], C)[1], compile(n[3], C)[1] } }
+		return { 39, compile(n[2], C), compile(n[3], C) }
 	elseif n[1] == 20 then -- add
-		return { { 18, compile(n[2], C)[1], compile(n[3], C)[1] } }
+		return { 18, compile(n[2], C), compile(n[3], C) }
 	elseif n[1] == 21 then -- sub
-		return { { 19, compile(n[2], C)[1], compile(n[3], C)[1] } }
+		return { 19, compile(n[2], C), compile(n[3], C) }
 	elseif n[1] == 22 then -- mul
-		return { { 20, compile(n[2], C)[1], compile(n[3], C)[1] } }
+		return { 20, compile(n[2], C), compile(n[3], C) }
 	elseif n[1] == 23 then -- div
-		return { { 21, compile(n[2], C)[1], compile(n[3], C)[1] } }
+		return { 21, compile(n[2], C), compile(n[3], C) }
 	elseif n[1] == 24 then -- pow
-		return { { 22, compile(n[2], C)[1], compile(n[3], C)[1] } }
+		return { 22, compile(n[2], C), compile(n[3], C) }
 	elseif n[1] == 25 then -- `~` xor
-		return { { 26, compile(n[2], C)[1], compile(n[3], C)[1] } }
+		return { 26, compile(n[2], C), compile(n[3], C) }
 	elseif n[1] == 26 then -- `&` bit and
-		return { { 25, compile(n[2], C)[1], compile(n[3], C)[1] } }
+		return { 25, compile(n[2], C), compile(n[3], C) }
 	elseif n[1] == 27 then -- `%` modulo
-		return { { 27, compile(n[2], C)[1], compile(n[3], C)[1] } }
+		return { 27, compile(n[2], C), compile(n[3], C) }
 	elseif n[1] == 28 then -- `<`
-		return { { 37, compile(n[2], C)[1], compile(n[3], C)[1] } }
+		return { 37, compile(n[2], C), compile(n[3], C) }
 	elseif n[1] == 29 then -- `>`
-		return { { 33, compile(n[2], C)[1], compile(n[3], C)[1] } }
+		return { 33, compile(n[2], C), compile(n[3], C) }
 	elseif n[1] == 30 then -- equals
-		return { { 35, compile(n[2], C)[1], compile(n[3], C)[1] } }
+		return { 35, compile(n[2], C), compile(n[3], C) }
 	elseif n[1] == 31 then -- not equals
-		return { { 38, compile(n[2], C)[1], compile(n[3], C)[1] } }
+		return { 38, compile(n[2], C), compile(n[3], C) }
 	elseif n[1] == 32 then -- concat
-		return { { 23, compile(n[2], C)[1], compile(n[3], C)[1] } }
+		return { 23, compile(n[2], C), compile(n[3], C) }
 	elseif n[1] == 33 then -- //
-		return { { 41, compile(n[2], C)[1], compile(n[3], C)[1] } }
+		return { 41, compile(n[2], C), compile(n[3], C) }
 	elseif n[1] == 34 then -- |
-		return { { 24, compile(n[2], C)[1], compile(n[3], C)[1] } }
+		return { 24, compile(n[2], C), compile(n[3], C) }
 	elseif n[1] == 35 then -- <<
-		return { { 31, compile(n[2], C)[1], compile(n[3], C)[1] } }
+		return { 31, compile(n[2], C), compile(n[3], C) }
 	elseif n[1] == 36 then -- <<
-		return { { 32, compile(n[2], C)[1], compile(n[3], C)[1] } }
+		return { 32, compile(n[2], C), compile(n[3], C) }
 	elseif n[1] == 38 then -- <=
-		return { { 34, compile(n[2], C)[1], compile(n[3], C)[1] } }
+		return { 34, compile(n[2], C), compile(n[3], C) }
 	elseif n[1] == 39 then -- >=
-		return { { 36, compile(n[2], C)[1], compile(n[3], C)[1] } }
+		return { 36, compile(n[2], C), compile(n[3], C) }
 	elseif n[1] == 50 then -- negative
-		return { { 28, compile(n[2], C)[1] } }
+		return { 28, compile(n[2], C) }
 	elseif n[1] == 51 then -- length
-		return { { 30, compile(n[2], C)[1] } }
+		return { 30, compile(n[2], C) }
 	elseif n[1] == 52 then -- negate
-		return { { 29, compile(n[2], C)[1] } }
+		return { 29, compile(n[2], C) }
 	elseif n[1] == 100 then -- group
 		local i = (C.r or 0) + 1
 		C.r = i
 
 		C.before = C.before or {}
-		table.insert(C.before, { 2, { { { i }, 0 } }, compile(n[2], C) })
-		return { { 4, { { { i }, 0 } } } }
+		table.insert(C.before, { 2, { { { i }, 0 } }, { compile(n[2], C) } })
+		return { 4, { { { i }, 0 } } }
 	elseif n[1] == 101 then -- variadic
-		return { { 5 } }
+		return { 5 }
 	elseif n[1] == 200 then -- path
 		local P = {}
 		local base = nil
 		if n[3] then
-			base = compile(n[3], C)[1]
+			base = compile(n[3], C)
 		end
 		for _, a in ipairs(n[2]) do
-			table.insert(P, compile(a, C)[1])
+			table.insert(P, compile(a, C))
 		end
-		return { { 4, { { P, base } } } }
+		return { 4, { { P, base } } }
 	elseif n[1] == 300 then -- local
 		if not n[3] then
-			return { { 1, n[2] } }
+			return { 1, n[2] }
 		end
 
 		local e = {}
 		for _, a in ipairs(n[3]) do
-			table.insert(e, compile(a, C)[1])
+			table.insert(e, compile(a, C))
 		end
 
 		local p = {}
 		for _, a in ipairs(n[2]) do
 			table.insert(p, { { a } })
 		end
+		C.before = C.before or {}
+		table.insert(C.before, { 1, n[2] })
 
-		return { { 1, n[2] }, { 2, p, e } }
+		return { 2, p, e }
 	elseif n[1] == 301 then -- do
 		local E = {}
 		for _, a in ipairs(n[2]) do
-			for _, s in ipairs(compile(a, C)) do
-				if C.before then
-					for _, o in ipairs(C.before) do
-						table.insert(E, o)
-					end
-					C.before = nil
-				end
-				table.insert(E, s)
-			end
-		end
-		return { { 14, E } }
-	elseif n[1] == 302 then -- if
-		local R = {}
-		local c, s, t = {}, {}, {}
-		for _, a in ipairs(n[2]) do
-			table.insert(c, compile(a, C)[1])
+			local r = compile(a, C)
 			if C.before then
 				for _, o in ipairs(C.before) do
-					table.insert(R, o)
+					table.insert(E, o)
 				end
 				C.before = nil
 			end
+			table.insert(E, r)
+		end
+		return { 14, E }
+	elseif n[1] == 302 then -- if
+		local c, s, t = {}, {}, {}
+		for _, a in ipairs(n[2]) do
+			table.insert(c, compile(a, C))
 		end
 		for _, a in ipairs(n[3]) do
+			local TC = {}
 			for _, l in ipairs(a) do
-				for _, o in ipairs(compile(l, C)) do
-					table.insert(t, o)
+				local r = compile(l, TC)
+				if TC.before then
+					for _, o in ipairs(TC.before) do
+						table.insert(t, o)
+					end
 				end
+				table.insert(t, r)
 			end
 
 			table.insert(s, { 14, t })
@@ -1582,10 +1579,9 @@ local function compile(n, _C)
 			T[4] = s[#s]
 		end
 
-		table.insert(R, r)
-		return R
+		return r
 	elseif n[1] == 303 then -- While
-		local c = compile(n[2], C)[1]
+		local c = compile(n[2], C)
 		local TC = {}
 		local b = {}
 		for _, a in ipairs(n[3]) do
@@ -1596,36 +1592,15 @@ local function compile(n, _C)
 				end
 				TC.before = nil
 			end
-			for _, o in ipairs(r) do
-				table.insert(b, o)
-			end
+			table.insert(b, r)
 		end
-		return { { 10, c, b } }
+		return { 10, c, b }
 	elseif n[1] == 304 then -- for
-		local O = {}
 		local TC = {}
 
-		local s = compile(n[3], TC)[1]
-		if TC.before then
-			for _, o in ipairs(TC.before) do
-				table.insert(O, o)
-			end
-			TC.before = nil
-		end
-		local e = compile(n[4], TC)[1]
-		if TC.before then
-			for _, o in ipairs(TC.before) do
-				table.insert(O, o)
-			end
-			TC.before = nil
-		end
-		local i = compile(n[5], TC)[1]
-		if TC.before then
-			for _, o in ipairs(TC.before) do
-				table.insert(O, o)
-			end
-			TC.before = nil
-		end
+		local s = compile(n[3], C)
+		local e = compile(n[4], C)
+		local i = compile(n[5], C)
 		local b = {}
 		for _, l in ipairs(n[6]) do
 			local r = compile(l, TC)
@@ -1635,13 +1610,10 @@ local function compile(n, _C)
 				end
 				TC.before = nil
 			end
-			for _, o in ipairs(r) do
-				table.insert(b, o)
-			end
+			table.insert(b, r)
 		end
 
-		table.insert(O, { 11, s, e, i, n[2], b })
-		return O
+		return { 11, s, e, i, n[2], b }
 	elseif n[1] == 305 then -- repeat
 		local TC, b = {}, {}
 		for _, s in ipairs(n[3]) do
@@ -1652,11 +1624,9 @@ local function compile(n, _C)
 				end
 				TC.before = nil
 			end
-			for _, o in ipairs(r) do
-				table.insert(b, o)
-			end
+			table.insert(b, r)
 		end
-		local e = compile(n[2], TC)[1]
+		local e = compile(n[2], TC)
 		if TC.before then
 			for _, o in ipairs(TC.before) do
 				table.insert(b, o)
@@ -1664,7 +1634,7 @@ local function compile(n, _C)
 			TC.before = nil
 		end
 
-		return { { 13, e, b } }
+		return { 13, e, b }
 	elseif n[1] == 306 then -- d function
 		local S = {}
 		local TC = {}
@@ -1676,26 +1646,25 @@ local function compile(n, _C)
 				end
 				TC.before = nil
 			end
-			for _, o in ipairs(r) do
-				table.insert(S, o)
-			end
+			table.insert(S, r)
 		end
 		if n[2] then
-			return { { 1, { n[3] } }, { 2, { { { n[3] } } }, { { 6, n[4], S } } } }
+			table.insert(C, { 1, { n[3] } })
+			return { 2, { { { n[3] } } }, { { 6, n[4], S } } }
 		end
 
-		return { { 2, { compile(n[3], C)[1][2][1] }, { { 6, n[4], S } } } }
+		return { 2, { compile(n[3], C)[2][1] }, { { 6, n[4], S } } }
 	elseif n[1] == 307 then -- return
 		local e = {}
 		for _, a in ipairs(n[2]) do
-			table.insert(e, compile(a, C)[1])
+			table.insert(e, compile(a, C))
 		end
-		return { { 15, e } }
+		return { 15, e }
 	elseif n[1] == 308 then -- break
-		return { { 16 } }
+		return { 16 }
 	elseif n[1] == 309 then -- foreach
 		local TC, b, r = {}, {}, nil
-		local e = compile(n[3], C)[1]
+		local e = compile(n[3], C)
 		for _, s in ipairs(n[4]) do
 			r = compile(s, TC)
 			if TC.before then
@@ -1704,21 +1673,19 @@ local function compile(n, _C)
 				end
 				TC.before = nil
 			end
-			for _, o in ipairs(r) do
-				table.insert(b, o)
-			end
+			table.insert(b, r)
 		end
-		return { { 12, e, n[2], b } }
+		return { 12, e, n[2], b }
 	elseif n[1] == 310 then -- set
 		local P = {}
 		local A = {}
 		for _, a in ipairs(n[2]) do
-			table.insert(P, compile(a, C)[1][2][1])
+			table.insert(P, compile(a, C)[2][1])
 		end
 		for _, a in ipairs(n[3]) do
-			table.insert(A, compile(a, C)[1])
+			table.insert(A, compile(a, C))
 		end
-		return { { 2, P, A } }
+		return { 2, P, A }
 	else
 		print(n[1])
 		error("TODO")
