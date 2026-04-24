@@ -410,6 +410,7 @@ local function ast_parse_expr_(C)
 		end
 
 		C[2] = C[2] + 1
+		local ts = C[2]
 		local s = C[1][C[2]]
 		if s and s.T == "p" then
 			if t.i == "." and s.i == "." then
@@ -419,7 +420,7 @@ local function ast_parse_expr_(C)
 					C[2] = C[2] + 1
 					return { 101, span = { t.span[1], l.span[2] } }
 				else
-					error(".. ?")
+					C[2] = ts
 				end
 			else
 			end
@@ -611,10 +612,12 @@ ast_parse_path_ = function(C, S)
 			return
 		elseif s.T == "p" then
 			if s.i == "." then
+				S = C[2]
 				C[2] = C[2] + 1
 				tok_trim(C)
 				local l = ast_parse_path(C)
 				if not l then
+					C[2] = S
 					return
 				end
 				return l
@@ -963,37 +966,59 @@ ast_parse_stmt = function(C)
 		if t.i == "local" then
 			local S, E = t.span[1], t.span[2]
 			local D = {}
-			local a
-			repeat
+			C[2] = C[2] + 1
+			tok_trim(C)
+			local a = C[1][C[2]]
+			if not a or a.T ~= "i" then
+				error("local, expects <ident> or function after `local`")
+			end
+
+			if a.i == "function" then
+				return parse_function(C, true)
+			end
+
+			if keywords[a.i] then
+				error("local, using reserved keyword: `" .. a.i .. "` for the first local <ident>, is invalid")
+			end
+			table.insert(D, a.i)
+
+			E = C[2]
+			C[2] = C[2] + 1
+			tok_trim(C)
+			a = C[1][C[2]]
+
+			if not a or a.T ~= "p" or not (a.i == "," or a.i == "=") then
+				return { 300, D, span = { S, E } }
+			end
+
+			while a and a.T == "p" and a.i == "," do
 				C[2] = C[2] + 1
 				tok_trim(C)
 				a = C[1][C[2]]
-				if not a then
-					error("local but nothing is specified after")
+				if not a or a.T ~= "i" or keywords[a.i] then
+					return { 300, D, span = { S, E } }
 				end
-				E = a.span[2]
-				if a.T == "i" then
-					if a.i == "function" then
-						return parse_function(C, true)
-					elseif keywords[a.i] then
-						if #D == 0 then
-							error("Local expects at least one name")
-						else
-							return { 300, D, span = { S, E } }
-						end
-					else
-						table.insert(D, a.i)
-					end
-				elseif a.T == "p" then
-					if a.i == ";" then
-						return { 300, D, span = { S, E } }
-					elseif a.i ~= "," and a.i ~= "=" then
-						error("invalid punct in local statement: " .. a.i)
-					end
-				else
-					error("local expects names")
-				end
-			until a.i == "="
+				E = C[2]
+				table.insert(D, a.i)
+				C[2] = C[2] + 1
+				tok_trim(C)
+				a = C[1][C[2]]
+			end
+
+			if not a or a.T ~= "p" then
+				return { 300, D, span = { S, E } }
+			end
+
+			if a.i == ";" then
+				E = C[2]
+				C[2] = C[2] + 1
+				return { 300, D, span = { S, E } }
+			end
+
+			if a.i ~= "=" then
+				error("local, after [<ident>] an `=` is expected")
+			end
+
 			local e = {}
 			repeat
 				C[2] = C[2] + 1
@@ -1485,9 +1510,9 @@ local function compile(n, _C)
 	elseif n[1] == 36 then -- <<
 		return { 32, compile(n[2], C), compile(n[3], C) }
 	elseif n[1] == 38 then -- <=
-		return { 34, compile(n[2], C), compile(n[3], C) }
-	elseif n[1] == 39 then -- >=
 		return { 36, compile(n[2], C), compile(n[3], C) }
+	elseif n[1] == 39 then -- >=
+		return { 34, compile(n[2], C), compile(n[3], C) }
 	elseif n[1] == 50 then -- negative
 		return { 28, compile(n[2], C) }
 	elseif n[1] == 51 then -- length

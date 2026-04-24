@@ -481,6 +481,18 @@ table.insert(tests, {
 	64,
 })
 
+table.insert(tests, {
+	"IIFE, concat",
+	[=[
+	(function()
+		local a = "Hello"
+		a = a .. " World!"
+		return a
+	end)()
+	]=],
+	"Hello World!",
+})
+
 local function run_test(test)
 	local name, source, result = table.unpack(test)
 	local is_ok, tokens_or_error, ast_node_or_error, bytecode_or_error, res
@@ -519,7 +531,7 @@ local function run_test(test)
 	is_ok, res = pcall(res)
 	if not is_ok then
 		print("AST:", show_table(ast_node_or_error))
-		print("Bytecode:", show_table(bytecode))
+		print("Bytecode:", show_table(bytecode_or_error))
 		print("\tError while running the virtual function")
 		print("\t" .. res)
 		return false
@@ -530,7 +542,7 @@ local function run_test(test)
 	end
 
 	print("AST:", show_table(ast_node_or_error))
-	print("Bytecode:", show_table(bytecode))
+	print("Bytecode:", show_table(bytecode_or_error))
 	print("\t Not maching: " .. show_table(result) .. " ~= " .. show_table(res))
 	return false
 end

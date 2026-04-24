@@ -69,12 +69,9 @@ local function stack_push_do(parent_stack)
 		set_errored = parent_stack.set_errored,
 		set_break = parent_stack.set_break,
 		evaluate = function(_) return parent_stack:evaluate() end,
-		returns = function(_) assert("This is not inside a function context") end,
-		errored = function(_) assert("This is not inside a function context") end,
-		is_break = function(_)
-			assert("This is not inside a loop context")
-			return false
-		end,
+		returns = parent_stack.returns,
+		errored = parent_stack.errored,
+		is_break = parent_stack.is_break,
 	}
 	setmetatable(stack, {
 		__index = function(_, at) if stack_state.has[at] then return stack_state.data[at] else return parent_stack.stack[at] end end,
@@ -100,8 +97,8 @@ local function stack_push_loop(parent_stack)
 		set_errored = parent_stack.set_errored,
 		set_break = function() loop_state.breaks = true end,
 		evaluate = function(self) return (not self:is_break()) and parent_stack:evaluate() end,
-		returns = function() assert("This is not inside a function context") end,
-		errored = function() assert("This is not inside a function context") end,
+		returns = parent_stack.returns,
+		errored = parent_stack.errored,
 		is_break = function() return loop_state.breaks end,
 	}
 	setmetatable(stack, {
@@ -275,7 +272,7 @@ local function eval_expr(SS, entry)
 					if not WS:evaluate() then break end
 				end
 
-				if WS:is_break() then break end
+				if WS:is_break() or WS:errored() or WS:returns() then break end
 			end
 		end,
 		function() -- 11 For
@@ -292,7 +289,7 @@ local function eval_expr(SS, entry)
 					if not FS:evaluate() then break end
 				end
 
-				if FS:is_break() then break end
+				if FS:is_break() or FS:errored() or FS:returns() then break end
 			end
 		end,
 		function() -- 12 Foreach
@@ -312,7 +309,7 @@ local function eval_expr(SS, entry)
 					if not FS:evaluate() then break end
 				end
 
-				if FS:is_break() then break end
+				if FS:is_break() or FS:errored() or FS:returns() then break end
 			end
 		end,
 		function() -- 13 Until
@@ -322,8 +319,10 @@ local function eval_expr(SS, entry)
 					eval_expr(LS, entry[3][i])
 					if not LS:evaluate() then break end
 				end
-				if LS:is_break() then break end
-			until eval_expr(LS, entry[2])[1]
+				if LS:is_break() or LS:errored() or LS:returns() then break end
+				local cond = eval_expr(LS, entry[2])
+				if LS:errored() then break end
+			until cond[1]
 		end,
 		function() -- 14 Do
 			local IS = stack_push_do(SS)
@@ -452,13 +451,21 @@ local function eval_expr(SS, entry)
 		end,
 		function() -- 39 BoolOr
 			local l = eval_expr(SS, entry[2])[1]
-			local r = eval_expr(SS, entry[3])[1]
-			table.insert(O, l or r)
+			if l then
+				table.insert(O, true)
+			else
+				local r = eval_expr(SS, entry[3])[1]
+				table.insert(O, l or r)
+			end
 		end,
 		function() -- 40 BoolAnd
 			local l = eval_expr(SS, entry[2])[1]
-			local r = eval_expr(SS, entry[3])[1]
-			table.insert(O, l and r)
+			if not l then
+				table.insert(O, false)
+			else
+				local r = eval_expr(SS, entry[3])[1]
+				table.insert(O, l and r)
+			end
 		end,
 		function() -- 41 FloorDiv
 			local l = eval_expr(SS, entry[2])[1]
