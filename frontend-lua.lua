@@ -481,6 +481,10 @@ ast_parse_expr = function(C)
 			return l
 		end
 	elseif t.T == "p" then
+		if t.i == "," or t.i == "}" or t.i == ";" or t.i == ")" then
+			return l
+		end
+
 		if l[1] == 100 then
 			local T = C[2]
 			local c = ast_parse_call(C, { 200, {}, l })
@@ -678,82 +682,80 @@ ast_parse_table = function(C)
 	if a.T ~= "p" or a.i ~= "{" then
 		return
 	end
-	C[2] = C[2] + 1
-	tok_trim(C)
-	a = C[1][C[2]]
 
-	local k, v = {}, {}
-	local i = 1
+	local k, v, e = {}, {}, {}
 
 	repeat
+		C[2] = C[2] + 1
+		tok_trim(C)
+		a = C[1][C[2]]
+		if not a then
+			error("Cannot read table, EOF")
+		end
+		if a.T == "p" and a.i == "}" then
+			break
+		end
+		local TS = C[2]
+		local entry_added = false
 		repeat
-			if a.T == "p" and a.i == "}" then
-				break
-			end
+			local l
 			if a.T == "p" and a.i == "[" then
 				C[2] = C[2] + 1
-				local l = ast_parse_expr(C)
+				l = ast_parse_expr(C)
 				if not l then
-					error("Invalid expresion in table key")
+					error("Invalid expresion in table key, at: " .. C[2])
 				end
 				a = C[1][C[2]]
 				if not a or a.T ~= "p" or a.i ~= "]" then
 					error("Invalid table key, expected ]")
 				end
-				C[2] = C[2] + 1
-				tok_trim(C)
-				a = C[1][C[2]]
-				if not a or a.T ~= "p" or a.i ~= "=" then
-					error("Invalid table entry, expected =")
-				end
-				C[2] = C[2] + 1
-				local r = ast_parse_expr(C)
-				if not r then
-					error("Invalid value in table")
-				end
-				table.insert(k, l)
-				table.insert(v, r)
-				tok_trim(C)
-				a = C[1][C[2]]
-			else
-				local l = ast_parse_expr(C)
-				tok_trim(C)
-				a = C[1][C[2]]
-				if not l then
+			elseif a.T == "i" then
+				if keywords[a.i] then
 					break
 				end
-
-				if a.T == "p" and a.i == "=" then
-					C[2] = C[2] + 1
-					local r = ast_parse_expr(C)
-					table.insert(k, l[2][1])
-					table.insert(v, r)
-					tok_trim(C)
-					a = C[1][C[2]]
-				else
-					if a.T ~= "p" or a.i ~= "=" then
-						table.insert(k, { 5, i })
-						i = i + 1
-						table.insert(v, l)
-						break
-					end
-				end
+				l = { 6, a.i, span = a.span }
+			else
+				break
 			end
-		until true
-		a = C[1][C[2]]
-		if a.T ~= "p" or (a.i ~= "," and a.i ~= "}") then
-			error("Expect , or }")
-		end
-		if a.T == "p" and a.i == "," then
 			C[2] = C[2] + 1
 			tok_trim(C)
 			a = C[1][C[2]]
+			if not a or a.T ~= "p" or a.i ~= "=" then
+				break
+			end
+			C[2] = C[2] + 1
+			tok_trim(C)
+			local r = ast_parse_expr(C)
+			if not r then
+				error("table, cannot parse value, at: " .. C[2])
+			end
+			table.insert(k, l)
+			table.insert(v, r)
+			tok_trim(C)
+			a = C[1][C[2]]
+			entry_added = true
+		until true
+		if not entry_added then
+			C[2] = TS
+			a = C[1][C[2]]
+			local l = ast_parse_expr(C)
+			if not l then
+				error("table, cannot parse element, at: " .. C[2])
+			end
+			tok_trim(C)
+			a = C[1][C[2]]
+			table.insert(e, l)
 		end
-	until a.T == "p" and a.i == "}"
-	if not (a.T == "p" and a.i == "}") then
-		print("Cannot find table end")
+	until not a or not (a.T == "p" and a.i == ",")
+	if not a or a.T ~= "p" or a.i ~= "}" then
+		error("table, unexpected table end")
 	end
 	C[2] = C[2] + 1
+
+	for i, o in ipairs(e) do
+		table.insert(k, { 5, i })
+		table.insert(v, o)
+	end
 
 	return { 7, k, v, span = { S, a.span[2] } }
 end

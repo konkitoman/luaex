@@ -38,8 +38,10 @@ local bytecode_frontend = frontend.compile(ast_node_frontend)
 local context = {
 	print = print,
 	table = table,
+	pairs = pairs,
 	ipairs = ipairs,
 	string = string,
+	tonumber = tonumber,
 	type = type,
 	pcall = pcall,
 	error = error,
@@ -54,23 +56,8 @@ local vm_frontend = executor.execute(context, bytecode_frontend)()
 context.executor = vm_executor
 context.frontend = vm_frontend
 
-local source_test = [=[
-print"Running inside the executor!"
-local tokens = frontend.parse[[print"Hello World!"]]
--- print"We have tokens"
--- print("Tokens:" .. show_table(tokens))
-local ast_node = frontend.ast_parse_module(tokens)
--- print"We have ast_node"
--- print("AST:" .. show_table(ast_node))
-local bytecode = frontend.compile(ast_node)
--- print("Bytecode:" .. show_table(bytecode))
--- print"We have bytecode"
-
-local context = {
-	print = print
-}
-executor.execute(context, bytecode)()
-]=]
+local file_test = io.open("test_lua.lua", "r")
+local source_test = file_test:read("a")
 
 local tokens_test = frontend.parse(source_test)
 local ast_node_test = frontend.ast_parse_module(tokens_test)

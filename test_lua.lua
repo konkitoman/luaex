@@ -1,5 +1,10 @@
-local frontend = require("frontend-lua")
-local executor = require("executor")
+if not frontend then
+	frontend = require("frontend-lua")
+end
+
+if not executor then
+	executor = require("executor")
+end
 
 local function show_table(table, depth)
 	depth = depth or 0
