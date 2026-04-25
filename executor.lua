@@ -109,10 +109,15 @@ local function stack_push_loop(parent_stack)
 	return stack_state
 end
 
+local function push(table, value)
+	table.n = table.n + 1
+	table[table.n] = value
+end
+
 local function eval_expr(SS, entry)
 	if not SS:evaluate() then return end
 
-	local O = {}
+	local O = { n = 0 }
 	local VT = {
 		function() -- 1 Define
 			for i=1,#entry[2],1 do
@@ -160,7 +165,7 @@ local function eval_expr(SS, entry)
 			for i=1,#entry[2],1 do
 				T[eval_expr(SS, entry[2][i])[1]] = eval_expr(SS, entry[3][i])[1]
 			end
-			table.insert(O, T)
+			push(O, T)
 		end,
 		function() -- 4 Read
 			for I=1, #entry[2], 1 do
@@ -186,17 +191,17 @@ local function eval_expr(SS, entry)
 				end
 
 				if l ~= SS.stack and l ~= SS.tmp then
-					table.insert(O, l)
+					push(O, l)
 				end
 			end
 		end,
 		function() -- 5 Variadic
-			for i = 1, #SS["$"], 1 do
-				table.insert(O, SS["$"][i])
+			for i = 1, SS["$"].n, 1 do
+				push(O, SS["$"][i])
 			end
 		end,
 		function() -- 6 Function
-			table.insert(O, function(...)
+			push(O, function(...)
 				local FS = stack_push_fn(SS)
 				local A = table.pack(...)
 				for i = 1, #entry[2], 1 do
@@ -205,13 +210,15 @@ local function eval_expr(SS, entry)
 				end
 				FS["$"] = A
 
-				local r = {}
+				local r = { n = 0 }
 
 				for I = 1, #entry[3], 1 do
 					local o = eval_expr(FS, entry[3][I])
 					if not FS:evaluate() then break end
-					for i = 1, #o, 1 do
-						table.insert(r, o[i])
+					if I == #entry[3] then
+						for i = 1, o.n, 1 do
+							push(r, o[i])
+						end
 					end
 				end
 
@@ -227,14 +234,14 @@ local function eval_expr(SS, entry)
 			end)
 		end,
 		function() -- 7 Insert
-			table.insert(O, entry[2])
+			push(O, entry[2])
 		end,
 		function() -- 8 Call
-			local A = {}
+			local A = { n = 0 }
 			for i = 1, #entry[3], 1 do
 				local o = eval_expr(SS, entry[3][i])
-				for i = 1, #o, 1 do
-					table.insert(A, o[i])
+				for i = 1, o.n, 1 do
+					push(A, o[i])
 				end
 			end
 
@@ -266,12 +273,12 @@ local function eval_expr(SS, entry)
 				SS.set_errored("attempt to call nil value " .. path)
 				return
 			end
-			local res = table.pack(pcall(f, table.unpack(A)))
+			local res = table.pack(pcall(f, table.unpack(A, 1, A.n)))
 			if not table.remove(res, 1) then
 				SS.set_errored(res[1])
 			else
-				for i = 1, #res, 1 do
-					table.insert(O, res[i])
+				for i = 1, res.n, 1 do
+					push(O, res[i])
 				end
 			end
 		end,
@@ -280,14 +287,14 @@ local function eval_expr(SS, entry)
 			if T then
 				local o = eval_expr(SS, entry[3])
 				if not o then return end
-				for i = 1, #o, 1 do
-					table.insert(O, o[i])
+				for i = 1, o.n, 1 do
+					push(O, o[i])
 				end
 			else
 				local o = eval_expr(SS, entry[4])
 				if not o then return end
-				for i = 1, #o, 1 do
-					table.insert(O, o[i])
+				for i = 1, o.n, 1 do
+					push(O, o[i])
 				end
 			end
 		end,
@@ -359,12 +366,12 @@ local function eval_expr(SS, entry)
 			end
 		end,
 		function() -- 15 Return
-			local A = {}
+			local A = { n = 0 }
 
 			for I = 1, #entry[2], 1 do
 				local o = eval_expr(SS, entry[2][I])
-				for i = 1, #o, 1 do
-					table.insert(A, o[i])
+				for i = 1, o.n, 1 do
+					push(A, o[i])
 				end
 			end
 
@@ -374,130 +381,130 @@ local function eval_expr(SS, entry)
 			SS.set_break()
 		end,
 		function() -- 17 Not
-			table.insert(O, not eval_expr(SS, entry[2])[1])
+			push(O, not eval_expr(SS, entry[2])[1])
 		end,
 		function() -- 18 Add
 			local l = eval_expr(SS, entry[2])[1]
 			local r = eval_expr(SS, entry[3])[1]
-			table.insert(O, l + r)
+			push(O, l + r)
 		end,
 		function() -- 19 Sub
 			local l = eval_expr(SS, entry[2])[1]
 			local r = eval_expr(SS, entry[3])[1]
-			table.insert(O, l - r)
+			push(O, l - r)
 		end,
 		function() -- 20 Mul
 			local l = eval_expr(SS, entry[2])[1]
 			local r = eval_expr(SS, entry[3])[1]
-			table.insert(O, l * r)
+			push(O, l * r)
 		end,
 		function() -- 21 Div
 			local l = eval_expr(SS, entry[2])[1]
 			local r = eval_expr(SS, entry[3])[1]
-			table.insert(O, l / r)
+			push(O, l / r)
 		end,
 		function() -- 22 Pow
 			local l = eval_expr(SS, entry[2])[1]
 			local r = eval_expr(SS, entry[3])[1]
-			table.insert(O, l ^ r)
+			push(O, l ^ r)
 		end,
 		function() -- 23 Concat
 			local l = eval_expr(SS, entry[2])[1]
 			local r = eval_expr(SS, entry[3])[1]
-			table.insert(O, l .. r)
+			push(O, l .. r)
 		end,
 		function() -- 24 Or
 			local l = eval_expr(SS, entry[2])[1]
 			local r = eval_expr(SS, entry[3])[1]
-			table.insert(O, l | r) -- not avalibile in luau
+			push(O, l | r) -- not avalibile in luau
 		end,
 		function() -- 25 And
 			local l = eval_expr(SS, entry[2])[1]
 			local r = eval_expr(SS, entry[3])[1]
-			table.insert(O, l & r) -- not avalibile in luau
+			push(O, l & r) -- not avalibile in luau
 		end,
 		function() -- 26 Xor
 			local l = eval_expr(SS, entry[2])[1]
 			local r = eval_expr(SS, entry[3])[1]
 
-			table.insert(O, l ~ r) -- not avalibile in luau
+			push(O, l ~ r) -- not avalibile in luau
 		end,
 		function() -- 27 Mod
 			local l = eval_expr(SS, entry[2])[1]
 			local r = eval_expr(SS, entry[3])[1]
-			table.insert(O, l % r)
+			push(O, l % r)
 		end,
 		function() -- 28 Negative
-			table.insert(O, -eval_expr(SS, entry[2])[1])
+			push(O, -eval_expr(SS, entry[2])[1])
 		end,
 		function() -- 29 Negate
-			table.insert(O, ~eval_expr(SS, entry[2])[1]) -- not avalibile in luau
+			push(O, ~eval_expr(SS, entry[2])[1]) -- not avalibile in luau
 		end,
 		function() -- 30 Length
-			table.insert(O, #eval_expr(SS, entry[2])[1])
+			push(O, #eval_expr(SS, entry[2])[1])
 		end,
 		function() -- 31 Shl
 			local l = eval_expr(SS, entry[2])[1]
 			local r = eval_expr(SS, entry[3])[1]
-			table.insert(O, l << r) -- not avalibile in luau
+			push(O, l << r) -- not avalibile in luau
 		end,
 		function() -- 32 Shr
 			local l = eval_expr(SS, entry[2])[1]
 			local r = eval_expr(SS, entry[3])[1]
-			table.insert(O, l >> r) -- not avalibile in luau
+			push(O, l >> r) -- not avalibile in luau
 		end,
 		function() -- 33 Less
 			local l = eval_expr(SS, entry[2])[1]
 			local r = eval_expr(SS, entry[3])[1]
-			table.insert(O, l > r)
+			push(O, l > r)
 		end,
 		function() -- 34 EqLess
 			local l = eval_expr(SS, entry[2])[1]
 			local r = eval_expr(SS, entry[3])[1]
-			table.insert(O, l >= r)
+			push(O, l >= r)
 		end,
 		function() -- 35 Equals
 			local l = eval_expr(SS, entry[2])[1]
 			local r = eval_expr(SS, entry[3])[1]
-			table.insert(O, l == r)
+			push(O, l == r)
 		end,
 		function() -- 36 EqGrater
 			local l = eval_expr(SS, entry[2])[1]
 			local r = eval_expr(SS, entry[3])[1]
-			table.insert(O, l <= r)
+			push(O, l <= r)
 		end,
 		function() -- 37 Grater
 			local l = eval_expr(SS, entry[2])[1]
 			local r = eval_expr(SS, entry[3])[1]
-			table.insert(O, l < r)
+			push(O, l < r)
 		end,
 		function() -- 38 NotEquals
 			local l = eval_expr(SS, entry[2])[1]
 			local r = eval_expr(SS, entry[3])[1]
-			table.insert(O, l ~= r)
+			push(O, l ~= r)
 		end,
 		function() -- 39 BoolOr
 			local l = eval_expr(SS, entry[2])[1]
 			if l then
-				table.insert(O, true)
+				push(O, true)
 			else
 				local r = eval_expr(SS, entry[3])[1]
-				table.insert(O, l or r)
+				push(O, l or r)
 			end
 		end,
 		function() -- 40 BoolAnd
 			local l = eval_expr(SS, entry[2])[1]
 			if not l then
-				table.insert(O, false)
+				push(O, false)
 			else
 				local r = eval_expr(SS, entry[3])[1]
-				table.insert(O, l and r)
+				push(O, l and r)
 			end
 		end,
 		function() -- 41 FloorDiv
 			local l = eval_expr(SS, entry[2])[1]
 			local r = eval_expr(SS, entry[3])[1]
-			table.insert(O, l // r)
+			push(O, l // r)
 		end,
 	}
 
