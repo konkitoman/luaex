@@ -226,10 +226,11 @@ local function eval_expr(SS, entry)
 					error(FS.errored())
 				end
 
-				if FS:returns() then
-					return table.unpack(FS:returns())
+				local ret = FS.returns()
+				if ret then
+					return table.unpack(ret, 1, ret.n)
 				else
-					if r then return table.unpack(r) end
+					if r then return table.unpack(r, 1, r.n) end
 				end
 			end)
 		end,
@@ -277,7 +278,7 @@ local function eval_expr(SS, entry)
 			if not table.remove(res, 1) then
 				SS.set_errored(res[1])
 			else
-				for i = 1, res.n, 1 do
+				for i = 1, res.n - 1, 1 do
 					push(O, res[i])
 				end
 			end
@@ -486,7 +487,7 @@ local function eval_expr(SS, entry)
 		function() -- 39 BoolOr
 			local l = eval_expr(SS, entry[2])[1]
 			if l then
-				push(O, true)
+				push(O, l)
 			else
 				local r = eval_expr(SS, entry[3])[1]
 				push(O, l or r)
@@ -495,7 +496,7 @@ local function eval_expr(SS, entry)
 		function() -- 40 BoolAnd
 			local l = eval_expr(SS, entry[2])[1]
 			if not l then
-				push(O, false)
+				push(O, l)
 			else
 				local r = eval_expr(SS, entry[3])[1]
 				push(O, l and r)

@@ -632,7 +632,9 @@ ast_parse_path_ = function(C, S)
 					error("Cannot read path at: " .. S .. "-" .. s.span[2])
 				end
 				s = C[1][C[2]]
-				if not s and s.T ~= "p" or s.i ~= "]" then
+				-- frontend is not parsing this correctly!
+				-- TODO: more work needs to be done for precedence.
+				if not s and (s.T ~= "p" or s.i ~= "]") then
 					error("Cannot path with expresion is not ending in `]` at: " .. S .. "-" .. s.span[2])
 				end
 				C[2] = C[2] + 1
@@ -1608,7 +1610,17 @@ local function compile(n, _C)
 
 		return r
 	elseif n[1] == 303 then -- While
-		local c = compile(n[2], C)
+		local CC, c = {}, {}
+		local tc = compile(n[2], CC)
+		if CC.before then
+			for _, o in ipairs(CC.before) do
+				table.insert(c, o)
+			end
+		end
+		table.insert(c, tc)
+
+		c = { 8, { 6, {}, c }, {} }
+
 		local TC = {}
 		local b = {}
 		for _, a in ipairs(n[3]) do
