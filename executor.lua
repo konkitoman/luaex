@@ -239,6 +239,33 @@ local function eval_expr(SS, entry)
 			end
 
 			local f = eval_expr(SS, entry[2])[1]
+			if not f then
+				local path = ''
+				if entry[2][1] == 4 then
+					if entry[2][2][1] then
+						if entry[2][2][1][2] then
+								path = '(<expr>)'
+						end
+						for _, s in ipairs(entry[2][2][1][1]) do
+								if type(s) == 'table' then
+								if s[1] == 7 then
+									if type(s[2]) == 'string' then
+									path = path .. '["' .. s[2] .. '"]'
+									else
+										path = path .. '[' .. s[2] .. ']'
+									end
+								else
+									path = path .. '[' .. '<expr>' .. ']'
+								end
+							else
+								path = path .. '[' .. s .. ']'
+							end
+						end
+					end
+				end
+				SS.set_errored("attempt to call nil value " .. path)
+				return
+			end
 			local res = table.pack(pcall(f, table.unpack(A)))
 			if not table.remove(res, 1) then
 				SS.set_errored(res[1])
