@@ -27,7 +27,7 @@ local tests = {
 		)
 		a, b, c = nil, nil, nil
 		a, b, c = context.implicit(32, 60)
-		assert(a == 32 and b == 60 and c == nil)
+		assert(a == 60 and b == nil and c == nil)
 	end,
 	["function, return"] = function()
 		local context = {}
