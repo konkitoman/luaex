@@ -104,6 +104,7 @@ type Table = {
     [1]: 3,
     [2]: {[number]: Expr}, -- keys
     [3]: {[number]: Expr}, -- values
+    [4]: {[number]: Expr}, -- expressions to be evaluated, then added as elements
 }
 ```
 This will result into a table put onto the stack.

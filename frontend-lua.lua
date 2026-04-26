@@ -633,7 +633,12 @@ ast_parse_path_ = function(C, S)
 				end
 				s = C[1][C[2]]
 				if not s or s.T ~= "p" or s.i ~= "]" then
-					error("path, path segment that starts with `[` is expected to end with `]`, at: " .. S .. "-" .. s.span[2])
+					error(
+						"path, path segment that starts with `[` is expected to end with `]`, at: "
+							.. S
+							.. "-"
+							.. s.span[2]
+					)
 				end
 				C[2] = C[2] + 1
 				local r = ast_parse_path_(C, S)
@@ -752,12 +757,7 @@ ast_parse_table = function(C)
 	end
 	C[2] = C[2] + 1
 
-	for i, o in ipairs(e) do
-		table.insert(k, { 5, i })
-		table.insert(v, o)
-	end
-
-	return { 7, k, v, span = { S, a.span[2] } }
+	return { 7, k, v, e, span = { S, a.span[2] } }
 end
 
 local function ast_parse_call_(C, p)
@@ -906,14 +906,28 @@ local parse_function = function(C, is_local)
 		C[2] = C[2] + 1
 		tok_trim(C)
 		k = C[1][C[2]]
-		if k and k.T == "p" and k.i == ")" then
+		if not k then
+			error("function, expect parameters end, at: " .. C[2])
+		end
+		if k.T == "p" and k.i == ")" then
 			break
 		end
-		if not k or not k.T == "i" then
-			error("Expecting an ident for the function paramenters")
+		if k.T == "p" and k.i == "." then
+			for _ = 1, 2, 1 do
+				C[2] = C[2] + 1
+				k = C[1][C[2]]
+				if not k or k.T ~= "p" or k.i ~= "." then
+					error("function, incomplete variadic")
+				end
+			end
+			C[2] = C[2] + 1
+		else
+			if not k.T == "i" then
+				error("Expecting an ident for the function paramenters")
+			end
+			table.insert(a, k.i)
+			C[2] = C[2] + 1
 		end
-		table.insert(a, k.i)
-		C[2] = C[2] + 1
 		tok_trim(C)
 		k = C[1][C[2]]
 		if k.T == "p" and k.i == ")" then
@@ -1447,14 +1461,17 @@ local function compile(n, _C)
 
 		return { 6, n[2], S }
 	elseif n[1] == 7 then -- table
-		local k, v = {}, {}
+		local k, v, e = {}, {}, {}
 		for _, a in ipairs(n[2]) do
 			table.insert(k, compile(a, C))
 		end
 		for _, a in ipairs(n[3]) do
 			table.insert(v, compile(a, C))
 		end
-		return { 3, k, v }
+		for _, a in ipairs(n[4]) do
+			table.insert(e, compile(a, C))
+		end
+		return { 3, k, v, e }
 	elseif n[1] == 9 then -- call self
 		local p = compile(n[2], C)
 		local i = (C.r or 0) + 1

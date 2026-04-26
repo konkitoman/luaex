@@ -498,6 +498,20 @@ table.insert(tests, {
 	"Hello World!",
 })
 
+table.insert(tests, {
+	"IIFE, table with variadic",
+	[=[
+	(function()
+		local function t_pack(...)
+			return { ... }
+		end
+		local t = t_pack(2, 64)
+		return t[1] * t[2]
+	end)()
+	]=],
+	128,
+})
+
 local function run_test(test)
 	local name, source, result = table.unpack(test)
 	local is_ok, tokens_or_error, ast_node_or_error, bytecode_or_error, res

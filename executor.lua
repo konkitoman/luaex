@@ -165,6 +165,12 @@ local function eval_expr(SS, entry)
 			for i=1,#entry[2],1 do
 				T[eval_expr(SS, entry[2][i])[1]] = eval_expr(SS, entry[3][i])[1]
 			end
+			for i=1,#entry[4],1 do
+				local o = eval_expr(SS, entry[4][i])
+				for n=1,o.n,1 do
+					table.insert(T, o[n])
+				end
+			end
 			push(O, T)
 		end,
 		function() -- 4 Read
