@@ -843,8 +843,7 @@ ast_parse_call = function(C, p)
 			return r
 		end
 
-		C[2] = s
-		return g
+		return t
 	end
 end
 
