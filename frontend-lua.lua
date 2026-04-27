@@ -1377,49 +1377,76 @@ ast_parse_stmt = function(C)
 			return { 307, e, span = { t.span[1], a.span[2] } }
 		elseif t.i == "function" then
 			return parse_function(C, false)
-		else
-			local S, E = t.span[1], t.span[2]
-			local L = {}
-			local a
-			repeat
-				tok_trim(C)
-				local p = ast_parse_path(C)
-				if p then
-					table.insert(L, p)
-				end
-				tok_trim(C)
-				a = C[1][C[2]]
-				if a then
-					E = a.span[2]
-					local c = ast_parse_call(C, p)
-					if c then
-						return c
-					end
-					if a.T == "p" and a.i ~= "," then
-						break
-					end
-					C[2] = C[2] + 1
-				end
-			until not a or (a.T == "i" and keywords[a.i]) or (a.T == "p" and a.i == "=")
-
-			if a and a.T == "p" and a.i == "=" then
-				local R = {}
-				repeat
-					C[2] = C[2] + 1
-					local l = ast_parse_expr(C)
-					if not l then
-						break
-					end
-					table.insert(R, l)
-					E = l.span[2]
-					tok_trim(C)
-					a = C[1][C[2]]
-				until not a or (a.T == "i" and keywords[a.i]) or a.T ~= "p" or a.i ~= ","
-
-				return { 310, L, R, span = { t.span[1], R[#R].span[2] } }
-			end
 		end
 	end
+
+	tok_trim(C)
+	local Q = C[2]
+	repeat
+		local p = ast_parse_path(C)
+		if not p then
+			break
+		end
+		tok_trim(C)
+		local T = C[2]
+		local c = ast_parse_call(C, p)
+		if c then
+			return c
+		end
+		C[2] = T
+
+		local L = { p }
+		local a
+
+		a = C[1][C[2]]
+		while a and a.T == "p" and a.i == "," do
+			C[2] = C[2] + 1
+			tok_trim(C)
+			p = ast_parse_path(C)
+			if not p then
+				error("set, cannot read another <path>, at: " .. C[2])
+			end
+			table.insert(L, p)
+			tok_trim(C)
+			a = C[1][C[2]]
+		end
+
+		if not a or a.T ~= "p" or a.i ~= "=" then
+			break
+		end
+
+		C[2] = C[2] + 1
+		tok_trim(C)
+
+		local e = ast_parse_expr(C)
+		if not e then
+			error("set, expect at least one <expr> after `=`, at: " .. C[2])
+		end
+
+		local R = { e }
+
+		tok_trim(C)
+		a = C[1][C[2]]
+		while a and a.T == "p" and a.i == "," do
+			C[2] = C[2] + 1
+			tok_trim(C)
+			e = ast_parse_expr(C)
+			if not e then
+				error("set, cannot read another <expr>, at: " .. C[2])
+			end
+			table.insert(R, e)
+			tok_trim(C)
+			a = C[1][C[2]]
+		end
+		return { 310, L, R, span = { t.span[1], R[#R].span[2] } }
+	until true
+	C[2] = Q
+
+	local e = ast_parse_expr(C)
+	if not e then
+		error("stmt, set failed, expression failed, at: " .. C[2])
+	end
+	return e
 end
 
 local function ast_parse_module(tokens)
