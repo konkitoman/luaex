@@ -16,6 +16,14 @@ That AST Node the will be passed to the `frontend.compile`, if you used `ast_par
  and that will result in the bytecode, that will be passed to the `executor.execute(context, bytecode)`.
 The `context` it will be an table, that is used as the global scope, if you run this inside lua, you can pass `_G` to give access to everything.
 
+Example:
+```lua
+local source = "return { something = true }"
+local fn_module = executor.execute(context, frontend.compile(frontend.ast_parse_module(frontend.parse(source))))
+-- fn_module() == { something = true }
+```
+At any step errors can occur, so you should call `parse`, `ast_parse_mode`, `compile` and `execute` using `pcall`, to handle errors.
+
 ## Motivation
 
 I was working an Roblox game/"experience" from a friend.
