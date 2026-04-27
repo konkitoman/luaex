@@ -399,14 +399,30 @@ local function ast_parse_expr_(C)
 			end
 			C[2] = C[2] + 1
 			tok_trim(C)
+
+			local c = ast_parse_call(C, { 200, {}, e })
 			local S = C[2]
-			local p = ast_parse_path_(C, S)
-			if p then
-				p[3] = e
-				return p
+			if c then
+				return c
 			end
 			C[2] = S
-			return { 100, e, span = { t.span[1], e.span[2] } }
+
+			local p = ast_parse_path_(C, S)
+
+			if not p then
+				C[2] = S
+				return { 100, e, span = { t.span[1], e.span[2] } }
+			end
+
+			p[3] = e
+			S = C[2]
+			c = ast_parse_call(C, p)
+			if not c then
+				C[2] = S
+				return p
+			end
+
+			return c
 		end
 
 		C[2] = C[2] + 1
@@ -483,15 +499,6 @@ ast_parse_expr = function(C)
 	elseif t.T == "p" then
 		if t.i == "," or t.i == "}" or t.i == ";" or t.i == ")" then
 			return l
-		end
-
-		if l[1] == 100 then
-			local T = C[2]
-			local c = ast_parse_call(C, { 200, {}, l })
-			if c then
-				return c
-			end
-			C[2] = T
 		end
 
 		C[2] = C[2] + 1
