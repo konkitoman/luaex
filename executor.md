@@ -117,7 +117,7 @@ type Read = {
     [2]: {[number]: Path}, -- to read
 }
 ```
-Will add the vaules inside those paths onto the stack.
+Will add the values inside those paths onto the stack.
 Equivalent to Lua `a`
 
 ### 5 Variadic
@@ -195,7 +195,7 @@ Equivalent to Lua `for i=start,end,increment do end`
 type Foreach = {
     [1]: 12,
     [2]: Expr, -- starter
-    [3]: {[number]: string}, -- agument names, max 3
+    [3]: {[number]: string}, -- argument names, max 3
     [4]: {[number]: Expr},
 }
 ```

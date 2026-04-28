@@ -8,7 +8,7 @@ or scope.
 
 the default stack, is the global stack.
 
-Variabiles defined in a stack, will not be accessibile in down stream stacks, but are visibile in upper stacks.
+Variabiles defined in a stack, will not be accessible in down stream stacks, but are visible in upper stacks.
 
 ```lua
 do
@@ -22,7 +22,7 @@ end
 
 - Any upper stack will depend on the down stream stacks variabiles.
 - When a function stack is created will not be able to break or return for an down stream stack.
-- When a loop stack is create will depend on the down stream stack return ability, and the break will be accessibile from the current to the upper stacks.
+- When a loop stack is create will depend on the down stream stack return ability, and the break will be accessible from the current to the upper stacks.
 - When a do stack is create will depend on the down stream stack return, break ability.
 - The module stack is a function stack, when we call `require(module)` is like calling that module.
 
@@ -174,7 +174,7 @@ end
 ```
 ## Calling
 
-When you call a function you need to specifi the function object, a table can be a function object, if has set a metatable with `__call`.
+When you call a function you need to specify the function object, a table can be a function object, if has set a metatable with `__call`.
 You call a function by using brackets `()` between the brackets are the arguments as a tuple.
 
 

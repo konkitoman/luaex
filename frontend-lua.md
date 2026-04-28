@@ -45,7 +45,7 @@ local bin = {
 }
 ```
 
-So what is valid lua, and how I can determin when an expresion or statement is finished.
+So what is valid lua, and how I can determine when an expression or statement is finished.
 So from: https://www.lua.org/manual/5.1/manual.html
 
 >[!quote] Keywords
@@ -79,7 +79,7 @@ Strings:
 
 Comments:
 - `--` is a single line comment, will end at the `"\n"`
-- `--[[` this is a multiline comment will end at the maching closing Long Bracket.
+- `--[[` this is a multiline comment will end at the matching closing Long Bracket.
 
 Calling a function:
 We have the `print` function to call
