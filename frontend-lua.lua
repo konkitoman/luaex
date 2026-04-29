@@ -235,7 +235,18 @@ local function ast_expr_apply_precedence(E)
 				(+, (*, 2, 10), 5)
 			]]
 			if pt > pr then
-				return { E[3][1], { E[1], E[2], E[3][2], span = { 0, 0 } }, E[3][3], span = { 0, 0 } }
+				local l = {
+					E[1],
+					E[2],
+					E[3][2],
+					span = { math.min(E[2].span[1], E[3][2].span[1]), math.max(E[2].span[2], E[3][2].span[2]) },
+				}
+				return {
+					E[3][1],
+					l,
+					E[3][3],
+					span = { math.min(l.span[1], E[3][3].span[1]), math.max(l.span[2], E[3][3].span[2]) },
+				}
 			end
 		end
 
@@ -248,7 +259,17 @@ local function ast_expr_apply_precedence(E)
 				(==, (#, {}), 1)
 			]]
 			if pt > pr then
-				return { E[2][1], { E[1], E[2][2], span = { 0, 0 } }, E[2][3], span = { 0, 0 } }
+				local l = {
+					E[1],
+					E[2][2],
+					span = { math.min(E.span[1], E[2][2].span[1]), math.max(E.span[2], E[2][2].span[2]) },
+				}
+				return {
+					E[2][1],
+					l,
+					E[2][3],
+					span = { math.min(l.span[1], E[2][3].span[1]), math.max(l.span[2], E[2][3].span[2]) },
+				}
 			end
 		end
 		return E
@@ -400,7 +421,7 @@ local function ast_parse_expr_(C)
 			C[2] = C[2] + 1
 			tok_trim(C)
 
-			local c = ast_parse_call(C, { 200, {}, e })
+			local c = ast_parse_call(C, { 200, {}, e, span = e.span })
 			local S = C[2]
 			if c then
 				return c
@@ -796,7 +817,7 @@ local function ast_parse_call_(C, p)
 		end
 		E = a.span[2]
 		C[2] = C[2] + 1
-		return { 10, p, P, span = { S, E } }
+		return { 10, p, P, span = { p.span[1], E } }
 	elseif a.T == "p" and a.i == "{" then
 		local t = ast_parse_table(C)
 		if not t then
@@ -834,7 +855,7 @@ ast_parse_call = function(C, p)
 		local t = ast_parse_path_(C, s)
 		if not t then
 			s = C[2]
-			t = ast_parse_call(C, { 200, {}, r })
+			t = ast_parse_call(C, { 200, {}, r, span = r.span })
 			if t then
 				return t
 			end
@@ -859,6 +880,7 @@ local parse_function = function(C, is_local)
 	if not t or t.T ~= "i" or t.i ~= "function" then
 		error("parse_function was called when there is not function!")
 	end
+	local span = { t.span[1] }
 
 	C[2] = C[2] + 1
 	tok_trim(C)
@@ -968,9 +990,10 @@ local parse_function = function(C, is_local)
 	if not k or not (k.T == "i" or k.i == "end") then
 		error("Function without end")
 	end
+	span[2] = k.span[2]
 	C[2] = C[2] + 1
 
-	return { 306, is_local, P, a, s }
+	return { 306, is_local, P, a, s, span = span }
 end
 
 ast_parse_stmt = function(C)
@@ -1084,8 +1107,11 @@ ast_parse_stmt = function(C)
 				error("Cannot find the end on a `do`")
 			end
 
+			C[2] = C[2] + 1
+
 			return { 301, s, span = { t.span[1], a.span[2] } }
 		elseif t.i == "if" then
+			local span = { t.span[1] }
 			C[2] = C[2] + 1
 			tok_trim(C)
 			local c, s, b, a, l, r = {}, {}, {}, nil, nil, nil
@@ -1158,10 +1184,12 @@ ast_parse_stmt = function(C)
 			if not a or a.T ~= "i" or a.i ~= "end" then
 				error("Expecting end for the if statements")
 			end
+			span[2] = a.span[2]
 			C[2] = C[2] + 1
 
-			return { 302, c, s }
+			return { 302, c, s, span = span }
 		elseif t.i == "while" then
+			local span = { t.span[2] }
 			C[2] = C[2] + 1
 			tok_trim(C)
 			local b, c, a, s = {}, nil, nil, nil
@@ -1189,10 +1217,12 @@ ast_parse_stmt = function(C)
 			if not a or a.T ~= "i" or a.i ~= "end" then
 				error("a while is expected to be ended in a while")
 			end
+			span[2] = a.span[2]
 			C[2] = C[2] + 1
 
-			return { 303, c, b }
+			return { 303, c, b, span = span }
 		elseif t.i == "for" then
+			local span = { t.span[1] }
 			C[2] = C[2] + 1
 			tok_trim(C)
 
@@ -1269,9 +1299,10 @@ ast_parse_stmt = function(C)
 				if a.T ~= "i" or a.i ~= "end" then
 					error("for, cannot found end")
 				end
+				span[2] = a.span[2]
 				C[2] = C[2] + 1
 
-				return { 304, n.i, s, m, i, b }
+				return { 304, n.i, s, m, i, b, span = span }
 			end
 
 			local k = { n.i }
@@ -1323,10 +1354,12 @@ ast_parse_stmt = function(C)
 			if not a or a.T ~= "i" or a.i ~= "end" then
 				error("for, cannot find end")
 			end
+			span[2] = a.span[2]
 			C[2] = C[2] + 1
 
-			return { 309, k, e, b }
+			return { 309, k, e, b, span = span }
 		elseif t.i == "repeat" then
+			local span = { t.span[1] }
 			C[2] = C[2] + 1
 			tok_trim(C)
 			local b, a, e, l = {}, nil, nil, nil
@@ -1349,8 +1382,9 @@ ast_parse_stmt = function(C)
 			if not e then
 				error("repeat, cannot read until expression")
 			end
+			span[2] = e.span[2]
 
-			return { 305, e, b }
+			return { 305, e, b, span = span }
 		elseif t.i == "break" then
 			C[2] = C[2] + 1
 			return { 308, span = t.span }
@@ -1462,7 +1496,7 @@ local function ast_parse_module(tokens)
 		table.insert(b, stmt)
 	end
 
-	return { 4, {}, b }
+	return { 4, {}, b, span = { b[1] and b[1].span[1] or 0, b[1] and b[#b].span[2] or 0 } }
 end
 
 local function compile(n, _C)

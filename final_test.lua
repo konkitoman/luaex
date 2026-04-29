@@ -38,6 +38,7 @@ local bytecode_frontend = frontend.compile(ast_node_frontend)
 local context = {
 	print = print,
 	table = table,
+	math = math,
 	pairs = pairs,
 	ipairs = ipairs,
 	string = string,
